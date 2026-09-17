@@ -1,0 +1,482 @@
+{
+  "rerank_on/recursive": {
+    "config": "rerank_on/recursive",
+    "ingest_s": 3.86,
+    "retrieval_correct_top3": "9/10",
+    "mean_latency_ms": 1.5,
+    "unanswerable_top1_page": 8,
+    "rows": [
+      {
+        "question": "What is retrieval augmented generation (RAG)?",
+        "expected_doc": "Week 5",
+        "expected_page": 10,
+        "top1": 10,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          10,
+          9,
+          2
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 4.4
+      },
+      {
+        "question": "Why use RAG? Give the benefits over training data.",
+        "expected_doc": "Week 5",
+        "expected_page": 11,
+        "top1": 11,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          11,
+          5,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.3
+      },
+      {
+        "question": "What two components does hybrid RAG combine?",
+        "expected_doc": "Week 5",
+        "expected_page": 18,
+        "top1": 18,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          18,
+          19,
+          6
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.2
+      },
+      {
+        "question": "What does the 'Vibe Coding on Prod' meme show? (visual)",
+        "expected_doc": "Week 2",
+        "expected_page": 33,
+        "top1": 33,
+        "top1_doc": "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx",
+        "top3_pages": [
+          33,
+          2,
+          30
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "Describe what the hybrid RAG pipeline diagram shows. (visual)",
+        "expected_doc": "Week 5",
+        "expected_page": 18,
+        "top1": 18,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          18,
+          38,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "What port does Gradio serve an app on by default?",
+        "expected_doc": "Week 4",
+        "expected_page": 7,
+        "top1": 7,
+        "top1_doc": "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx",
+        "top3_pages": [
+          7,
+          19,
+          26
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.1
+      },
+      {
+        "question": "What is semantic search typically based on?",
+        "expected_doc": "Week 5",
+        "expected_page": 15,
+        "top1": 15,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          15,
+          17,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.2
+      },
+      {
+        "question": "Name two common chunking strategies.",
+        "expected_doc": "Week 5",
+        "expected_page": 17,
+        "top1": 17,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          17,
+          16,
+          36
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.3
+      },
+      {
+        "question": "Who won the 2024 Super Bowl and by how much?",
+        "expected_doc": null,
+        "expected_page": null,
+        "top1": 8,
+        "top1_doc": "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx",
+        "top3_pages": [
+          8,
+          17,
+          23
+        ],
+        "correct": false,
+        "source_support": true,
+        "latency_ms": 1.3
+      },
+      {
+        "question": "How is RAG context optimization different from fine-tuning?",
+        "expected_doc": "Week 5",
+        "expected_page": 13,
+        "top1": 13,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          13,
+          25,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      }
+    ],
+    "id": "rerank_on/recursive"
+  },
+  "rerank_off/recursive": {
+    "config": "rerank_off/recursive",
+    "ingest_s": 3.78,
+    "retrieval_correct_top3": "9/10",
+    "mean_latency_ms": 1.2,
+    "unanswerable_top1_page": 8,
+    "rows": [
+      {
+        "question": "What is retrieval augmented generation (RAG)?",
+        "expected_doc": "Week 5",
+        "expected_page": 10,
+        "top1": 9,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          9,
+          2,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 3.7
+      },
+      {
+        "question": "Why use RAG? Give the benefits over training data.",
+        "expected_doc": "Week 5",
+        "expected_page": 11,
+        "top1": 11,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          11,
+          5,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "What two components does hybrid RAG combine?",
+        "expected_doc": "Week 5",
+        "expected_page": 18,
+        "top1": 18,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          18,
+          19,
+          6
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "What does the 'Vibe Coding on Prod' meme show? (visual)",
+        "expected_doc": "Week 2",
+        "expected_page": 33,
+        "top1": 33,
+        "top1_doc": "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx",
+        "top3_pages": [
+          33,
+          2,
+          30
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.1
+      },
+      {
+        "question": "Describe what the hybrid RAG pipeline diagram shows. (visual)",
+        "expected_doc": "Week 5",
+        "expected_page": 18,
+        "top1": 18,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          18,
+          38,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "What port does Gradio serve an app on by default?",
+        "expected_doc": "Week 4",
+        "expected_page": 7,
+        "top1": 7,
+        "top1_doc": "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx",
+        "top3_pages": [
+          7,
+          19,
+          26
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "What is semantic search typically based on?",
+        "expected_doc": "Week 5",
+        "expected_page": 15,
+        "top1": 15,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          15,
+          17,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 0.9
+      },
+      {
+        "question": "Name two common chunking strategies.",
+        "expected_doc": "Week 5",
+        "expected_page": 17,
+        "top1": 17,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          17,
+          16,
+          36
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 0.9
+      },
+      {
+        "question": "Who won the 2024 Super Bowl and by how much?",
+        "expected_doc": null,
+        "expected_page": null,
+        "top1": 8,
+        "top1_doc": "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx",
+        "top3_pages": [
+          8,
+          23,
+          17
+        ],
+        "correct": false,
+        "source_support": true,
+        "latency_ms": 0.9
+      },
+      {
+        "question": "How is RAG context optimization different from fine-tuning?",
+        "expected_doc": "Week 5",
+        "expected_page": 13,
+        "top1": 13,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          13,
+          25,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 0.9
+      }
+    ],
+    "id": "rerank_off/recursive"
+  },
+  "rerank_on/fixed": {
+    "config": "rerank_on/fixed",
+    "ingest_s": 3.85,
+    "retrieval_correct_top3": "9/10",
+    "mean_latency_ms": 1.3,
+    "unanswerable_top1_page": 8,
+    "rows": [
+      {
+        "question": "What is retrieval augmented generation (RAG)?",
+        "expected_doc": "Week 5",
+        "expected_page": 10,
+        "top1": 10,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          10,
+          9,
+          2
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 4.0
+      },
+      {
+        "question": "Why use RAG? Give the benefits over training data.",
+        "expected_doc": "Week 5",
+        "expected_page": 11,
+        "top1": 11,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          11,
+          5,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.1
+      },
+      {
+        "question": "What two components does hybrid RAG combine?",
+        "expected_doc": "Week 5",
+        "expected_page": 18,
+        "top1": 18,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          18,
+          19,
+          6
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "What does the 'Vibe Coding on Prod' meme show? (visual)",
+        "expected_doc": "Week 2",
+        "expected_page": 33,
+        "top1": 33,
+        "top1_doc": "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx",
+        "top3_pages": [
+          33,
+          2,
+          30
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "Describe what the hybrid RAG pipeline diagram shows. (visual)",
+        "expected_doc": "Week 5",
+        "expected_page": 18,
+        "top1": 18,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          18,
+          38,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "What port does Gradio serve an app on by default?",
+        "expected_doc": "Week 4",
+        "expected_page": 7,
+        "top1": 7,
+        "top1_doc": "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx",
+        "top3_pages": [
+          7,
+          19,
+          26
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.0
+      },
+      {
+        "question": "What is semantic search typically based on?",
+        "expected_doc": "Week 5",
+        "expected_page": 15,
+        "top1": 15,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          15,
+          17,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.3
+      },
+      {
+        "question": "Name two common chunking strategies.",
+        "expected_doc": "Week 5",
+        "expected_page": 17,
+        "top1": 17,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          17,
+          16,
+          36
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 1.2
+      },
+      {
+        "question": "Who won the 2024 Super Bowl and by how much?",
+        "expected_doc": null,
+        "expected_page": null,
+        "top1": 8,
+        "top1_doc": "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx",
+        "top3_pages": [
+          8,
+          17,
+          23
+        ],
+        "correct": false,
+        "source_support": true,
+        "latency_ms": 0.9
+      },
+      {
+        "question": "How is RAG context optimization different from fine-tuning?",
+        "expected_doc": "Week 5",
+        "expected_page": 13,
+        "top1": 13,
+        "top1_doc": "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx",
+        "top3_pages": [
+          13,
+          25,
+          10
+        ],
+        "correct": true,
+        "source_support": true,
+        "latency_ms": 0.9
+      }
+    ],
+    "id": "rerank_on/fixed"
+  }
+}
