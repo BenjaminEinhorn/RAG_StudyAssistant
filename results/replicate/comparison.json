@@ -7,7 +7,7 @@
       "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx",
       "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx"
     ],
-    "ingest_s": 14.9,
+    "ingest_s": 15.0,
     "models": {
       "llm": {
         "base_url": "http://dobolyi.com:9001/v1",
@@ -29,7 +29,7 @@
     "k_text": 5,
     "k_visual": 3,
     "candidate_pool_per_retriever": 20,
-    "run_at": "2026-09-18 13:28:02 MDT"
+    "run_at": "2026-09-18 13:30:15 MDT"
   },
   "summary": {
     "rerank_on": {
@@ -39,22 +39,22 @@
       "all_cited_in_evidence": "9/9",
       "all_excerpts_found": "9/9",
       "unanswerable_abstained": "1/1",
-      "latency_median_s": 4.667,
-      "latency_mean_s": 4.595,
-      "latency_max_s": 5.366,
-      "retrieval_median_s": 2.688
+      "latency_median_s": 4.403,
+      "latency_mean_s": 4.502,
+      "latency_max_s": 5.517,
+      "retrieval_median_s": 2.88
     },
     "rerank_off": {
       "errors": 0,
       "target_retrieved": "9/9",
       "target_cited": "9/9",
       "all_cited_in_evidence": "9/9",
-      "all_excerpts_found": "8/9",
+      "all_excerpts_found": "9/9",
       "unanswerable_abstained": "1/1",
-      "latency_median_s": 2.756,
-      "latency_mean_s": 2.752,
-      "latency_max_s": 3.999,
-      "retrieval_median_s": 0.794
+      "latency_median_s": 2.45,
+      "latency_mean_s": 2.416,
+      "latency_max_s": 3.178,
+      "retrieval_median_s": 0.786
     }
   },
   "rows": [
@@ -64,10 +64,10 @@
       "question": "What is retrieval augmented generation (RAG)?",
       "type": "text",
       "expected": "Week 5 slide 10",
-      "latency_s": 3.053,
-      "retrieval_s": 0.757,
+      "latency_s": 3.072,
+      "retrieval_s": 0.785,
       "error": null,
-      "answer": "Retrieval-Augmented Generation (RAG) is a technique that retrieves relevant information from documents, databases, and other data sources and adds it to a model's context to help generate a response to a user's prompt or question [2]. It gives a model access to information beyond its training data, including more recent or private information [5]. RAG optimizes context by supplying relevant information when the model responds [7]. In a Hybrid RAG pipeline, retrieval finds relevant candidate chunks using both keyword search and vector search, and reranking compares these candidates to the original question to prioritize which chunks are supplied to the LLM as context [6].",
+      "answer": "Retrieval-augmented generation (RAG) is a technique that retrieves relevant information from documents, databases, and other data sources and adds it to a model\u2019s context to help generate a response to a user\u2019s prompt or question (MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx \u2014 slide/page 10). It gives a model access to information beyond its training data, including more recent or private information (MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx \u2014 slide/page 11). RAG optimizes context by supplying relevant information when the model responds (MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx \u2014 slide/page 13).",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p9",
@@ -82,14 +82,12 @@
       "cited": [
         "[2] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p10",
         "[5] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11",
-        "[7] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p13",
-        "[6] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18"
+        "[7] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p13"
       ],
       "excerpts": [
         "retrieves relevant information from documents, databases, and other data sources and adds it to a model\u2019s context to help generate a response to a user\u2019s prompt/question",
         "RAG gives a model access to information beyond its training data, including more recent or private information",
-        "RAG optimizes context by supplying relevant information when the model responds",
-        "Retrieval finds relevant candidate chunks using both keyword search and vector search in Hybrid RAG"
+        "RAG optimizes context by supplying relevant information when the model responds"
       ],
       "images_shown": 4,
       "target_retrieved": true,
@@ -104,10 +102,10 @@
       "question": "What is retrieval augmented generation (RAG)?",
       "type": "text",
       "expected": "Week 5 slide 10",
-      "latency_s": 4.755,
-      "retrieval_s": 2.586,
+      "latency_s": 5.517,
+      "retrieval_s": 3.679,
       "error": null,
-      "answer": "Retrieval-Augmented Generation (RAG) is a technique that retrieves relevant information from documents, databases, and other data sources and adds it to a model's context to help generate a response to a user's prompt or question. As shown in the \"Simplified RAG\" diagram on slide 10 of the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" deck, this process involves retrieving supporting data, augmenting the prompt with that data, and then generating a response using the LLM. Additionally, slide 18 explains that RAG uses information from prepared documents to help an LLM answer the user's question, often using a hybrid pipeline that includes keyword search, vector search, and reranking to prioritize which chunks are supplied as context.",
+      "answer": "Retrieval-Augmented Generation (RAG) is a technique that retrieves relevant information from documents, databases, and other data sources and adds it to a model's context to help generate a response to a user's prompt or question. As shown in the \"Simplified RAG\" diagram on slide 10 of the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" presentation, the process involves retrieving supporting data, augmenting the prompt with that data, and then generating a response. Additionally, slide 13 notes that RAG optimizes context by supplying relevant information when the model responds.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p10",
@@ -115,15 +113,15 @@
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11",
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18",
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p12",
-        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p5"
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p13"
       ],
       "cited": [
         "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p10",
-        "[4] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18"
+        "[6] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p13"
       ],
       "excerpts": [
         "retrieves relevant information from documents, databases, and other data sources and adds it to a model\u2019s context to help generate a response to a user\u2019s prompt/question",
-        "RAG uses information from prepared documents to help an LLM answer the user\u2019s question"
+        "RAG optimizes context by supplying relevant information when the model responds"
       ],
       "images_shown": 4,
       "target_retrieved": true,
@@ -138,10 +136,10 @@
       "question": "Why use RAG? Give the benefits over training data.",
       "type": "text",
       "expected": "Week 5 slide 11",
-      "latency_s": 3.999,
-      "retrieval_s": 0.848,
+      "latency_s": 3.178,
+      "retrieval_s": 0.786,
       "error": null,
-      "answer": "According to the \"Why Use RAG?\" slide in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation (page 11), RAG provides several benefits over relying solely on a model's training data:\n\n1. **Access to New/Private Data:** It gives the model access to information beyond its training data, including \"more recent or private information.\"\n2. **Grounding and Verification:** It selects relevant material from a large collection and \"grounds responses in sources, making answers easier to verify.\"\n3. **Reducing Hallucinations:** By grounding responses in sources, it \"potentially reduc[es] hallucinations.\"\n\nThe slide also highlights three specific benefits of RAG:\n*   **Grounding:** \"Links answers to real evidence instead of relying only on memorized training data. This reduces hallucinations by tying outputs to verifiable sources.\"\n*   **Scalability:** \"Lets one model adapt to many domains without constant retraining. Retrieval keeps knowledge bases current, making it easier to scale across use cases.\"\n*   **Cost efficiency:** \"Cuts down on repeated fine-tuning and heavy compute cycles. Shifting knowledge into external systems lowers overall costs.\"",
+      "answer": "According to the \"Why Use RAG?\" slide in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation (page 11), RAG provides several benefits over relying solely on a model's training data:\n\n*   **Access to New/Private Data:** It \"gives a model access to information beyond its training data, including more recent or private information.\"\n*   **Grounding and Verification:** It \"selects relevant material from a large collection \u2013 or corpus \u2013 and grounds responses in sources, making answers easier to verify.\"\n*   **Reduced Hallucinations:** By grounding responses in sources, it \"potentially reduc[es] hallucinations.\"\n\nThe slide also highlights three specific benefits of RAG:\n*   **Grounding:** \"Links answers to real evidence instead of relying only on memorized training data. This reduces hallucinations by tying outputs to verifiable sources.\"\n*   **Scalability:** \"Lets one model adapt to many domains without constant retraining. Retrieval keeps knowledge bases current, making it easier to scale across use cases.\"\n*   **Cost Efficiency:** \"Cuts down on repeated fine-tuning and heavy compute cycles. Shifting knowledge into external systems lowers overall costs.\"",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11",
@@ -154,23 +152,17 @@
       ],
       "cited": [
         "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11",
-        "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11",
-        "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11",
-        "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11",
         "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11"
       ],
       "excerpts": [
-        "RAG gives a model access to information beyond its training data",
-        "grounds responses in sources, making answers easier to verify, potentially reducing hallucinations",
-        "Links answers to real evidence instead of relying only on memorized training data.",
-        "Lets one model adapt to many domains without constant retraining.",
-        "Cuts down on repeated fine-tuning and heavy compute cycles."
+        "RAG gives a model access to information beyond its training data, including more recent or private information",
+        "It selects relevant material from a large collection \u2013 or corpus \u2013 and grounds responses in sources, making answers easier to verify, potentially reducing hallucinations"
       ],
       "images_shown": 4,
       "target_retrieved": true,
       "target_cited": true,
       "all_cited_in_evidence": true,
-      "all_excerpts_found": false,
+      "all_excerpts_found": true,
       "abstained": false
     },
     {
@@ -179,10 +171,10 @@
       "question": "Why use RAG? Give the benefits over training data.",
       "type": "text",
       "expected": "Week 5 slide 11",
-      "latency_s": 5.366,
-      "retrieval_s": 2.676,
+      "latency_s": 5.007,
+      "retrieval_s": 2.591,
       "error": null,
-      "answer": "According to the \"Why Use RAG?\" slide in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation (slide 11), RAG provides several benefits over relying solely on a model's training data:\n\n*   **Access to New and Private Data:** It \"gives a model access to information beyond its training data, including more recent or private information.\"\n*   **Grounding and Verification:** It \"grounds responses in sources, making answers easier to verify.\"\n*   **Reduced Hallucinations:** By grounding responses in sources, it can \"potentially reduc[e] hallucinations.\"\n*   **Cost Efficiency:** As shown in the \"Benefits of RAG\" diagram on the same slide, RAG offers \"Cost efficiency\" by \"Cut[ting] down on repeated fine-tuning and heavy compute cycles. Shifting knowledge into external systems lowers overall costs.\"\n*   **Scalability:** The diagram also highlights \"Scalability,\" explaining that it \"Lets one model adapt to many domains without constant retraining. Retrieval keeps knowledge bases current, making it easier to scale across use cases.\"",
+      "answer": "According to the \"Why Use RAG?\" slide in the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" presentation (page 11), RAG provides several benefits over relying solely on a model's training data:\n\n*   **Access to New and Private Information:** It \"gives a model access to information beyond its training data, including more recent or private information.\"\n*   **Grounding and Verification:** It \"selects relevant material from a large collection \u2013 or corpus \u2013 and grounds responses in sources, making answers easier to verify.\"\n*   **Reduced Hallucinations:** By grounding responses in sources, it can \"potentially reduc[e] hallucinations.\"\n*   **Cost Efficiency:** As shown in the \"Benefits of RAG\" diagram on the same slide, it offers \"Cost efficiency\" by \"Cut[ting] down on repeated fine-tuning and heavy compute cycles. Shifting knowledge into external systems lowers overall costs.\"\n*   **Scalability:** The diagram also highlights \"Scalability,\" explaining that it \"Lets one model adapt to many domains without constant retraining. Retrieval keeps knowledge bases current, making it easier to scale across use cases.\"",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11",
@@ -197,7 +189,7 @@
       ],
       "excerpts": [
         "RAG gives a model access to information beyond its training data, including more recent or private information",
-        "grounds responses in sources, making answers easier to verify, potentially reducing hallucinations"
+        "It selects relevant material from a large collection \u2013 or corpus \u2013 and grounds responses in sources, making answers easier to verify, potentially reducing hallucinations"
       ],
       "images_shown": 4,
       "target_retrieved": true,
@@ -212,10 +204,10 @@
       "question": "What two components does hybrid RAG combine?",
       "type": "text",
       "expected": "Week 5 slide 18",
-      "latency_s": 2.572,
-      "retrieval_s": 0.757,
+      "latency_s": 2.061,
+      "retrieval_s": 0.803,
       "error": null,
-      "answer": "According to the \"Hybrid RAG Pipeline with Reranking\" diagram and text on slide 18 of the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" presentation, hybrid RAG combines **keyword search** and **vector search** to find relevant candidate chunks.",
+      "answer": "According to the slide titled \"Hybrid RAG Pipeline with Reranking\" (MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx, page 18), Hybrid RAG combines **keyword search** and **vector search** to find relevant candidate chunks.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18",
@@ -245,16 +237,16 @@
       "question": "What two components does hybrid RAG combine?",
       "type": "text",
       "expected": "Week 5 slide 18",
-      "latency_s": 4.189,
-      "retrieval_s": 2.617,
+      "latency_s": 4.224,
+      "retrieval_s": 2.621,
       "error": null,
-      "answer": "Based on the slide titled \"Hybrid RAG Pipeline with Reranking\" (MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx, page 18), Hybrid RAG combines **keyword search** and **vector search** to find relevant candidate chunks.",
+      "answer": "According to the \"Hybrid RAG Pipeline with Reranking\" diagram and text on slide 18 of the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" presentation, Hybrid RAG combines **keyword search** and **vector search** to find relevant candidate chunks.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18",
-        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16",
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p15",
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p2",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16",
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p9",
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p5",
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p13"
@@ -278,10 +270,10 @@
       "question": "What does the 'Vibe Coding on Prod' meme show?",
       "type": "visual",
       "expected": "Week 2 slide 33",
-      "latency_s": 2.781,
-      "retrieval_s": 0.81,
+      "latency_s": 2.615,
+      "retrieval_s": 0.776,
       "error": null,
-      "answer": "The meme on slide 33 of the \"MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx\" presentation uses the \"One Does Not Simply\" format to humorously warn against using \"Vibe Coding\" for serious work. The text on the image reads, \"ONE DOES NOT SIMPLY VIBE CODE A PRODUCTION-GRADE ENTERPRISE APP,\" suggesting that this casual, prompt-based coding style is not suitable for building robust, professional-grade applications.",
+      "answer": "The meme on slide 33 of the \"MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx\" presentation is titled \"Vibe Coding on 'Prod'\". It features the \"One Does Not Simply\" meme format, which is used to humorously suggest that a task is difficult or impossible. The text on the image reads: \"ONE DOES NOT SIMPLY VIBE CODE A PRODUCTION-GRADE ENTERPRISE APP\".",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p33",
@@ -310,10 +302,10 @@
       "question": "What does the 'Vibe Coding on Prod' meme show?",
       "type": "visual",
       "expected": "Week 2 slide 33",
-      "latency_s": 4.794,
-      "retrieval_s": 2.921,
+      "latency_s": 4.318,
+      "retrieval_s": 2.941,
       "error": null,
-      "answer": "The 'Vibe Coding on Prod' meme on slide 33 of the 'MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx' presentation features the 'One Does Not Simply' template. It humorously warns that 'ONE DOES NOT SIMPLY VIBE CODE A PRODUCTION-GRADE ENTERPRISE APP'.",
+      "answer": "The 'Vibe Coding on Prod' meme, shown on slide 33 of the MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx presentation, uses the 'One Does Not Simply' format to humorously warn that one should not simply 'VIBE CODE A PRODUCTION-GRADE ENTERPRISE APP'.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p33",
@@ -343,10 +335,10 @@
       "question": "Describe what the hybrid RAG pipeline diagram shows.",
       "type": "visual",
       "expected": "Week 5 slide 18",
-      "latency_s": 2.956,
-      "retrieval_s": 0.794,
+      "latency_s": 2.76,
+      "retrieval_s": 0.8,
       "error": null,
-      "answer": "The \"Hybrid RAG Pipeline with Reranking\" diagram on slide 18 of the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" document illustrates a process for answering a user's question. The process begins with a \"Question\" that is sent to two parallel retrieval methods: \"Keyword Search\" and an \"Embedding Model\" followed by \"Vector Search.\" Both methods produce \"Candidate Chunks.\" These candidates are then fed into a \"Reranker,\" which \"compares these candidates to the original question and prioritizes which chunks are supplied to the LLM as context.\" The final output is \"Ranked Chunks With Source Details.\"",
+      "answer": "The diagram on slide 18 of the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" presentation illustrates a \"Hybrid RAG Pipeline with Reranking.\" As described in the slide, this pipeline uses information from prepared documents to help an LLM answer a user's question. The process begins with a \"Question\" that is sent to two parallel retrieval methods: \"Keyword Search\" and \"Vector Search\" (which uses an \"Embedding Model\"). These methods combine to produce \"Candidate Chunks.\" These candidates are then passed to a \"Reranker,\" which \"compares these candidates to the original question and prioritizes which chunks are supplied to the LLM as context.\" The final output is \"Ranked Chunks With Source Details.\"",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18",
@@ -380,10 +372,10 @@
       "question": "Describe what the hybrid RAG pipeline diagram shows.",
       "type": "visual",
       "expected": "Week 5 slide 18",
-      "latency_s": 5.017,
-      "retrieval_s": 2.688,
+      "latency_s": 5.035,
+      "retrieval_s": 3.039,
       "error": null,
-      "answer": "The diagram on slide 18 of the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" presentation illustrates the \"Hybrid RAG Pipeline with Reranking.\" This pipeline is designed to help an LLM answer a user's question by using information from prepared documents. The process begins with a user's question, which is processed through two parallel retrieval methods: \"Keyword Search\" and \"Vector Search\" (which uses an \"Embedding Model\"). These two methods combine to produce \"Candidate Chunks.\" These candidates are then passed to a \"Reranker,\" which \"compares these candidates to the original question and prioritizes which chunks are supplied to the LLM as context.\" The final output of this pipeline is \"Ranked Chunks With Source Details.\"",
+      "answer": "The \"Hybrid RAG Pipeline with Reranking\" diagram on slide 18 of the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" document illustrates how a system uses prepared documents to help an LLM answer a user's question. The process begins with a user's question, which is processed through two parallel retrieval methods: \"Keyword Search\" and \"Vector Search\" (which uses an \"Embedding Model\"). Both methods produce \"Candidate Chunks.\" These candidates are then passed to a \"Reranker,\" which \"compares these candidates to the original question and prioritizes which chunks are supplied to the LLM as context.\" The final output is \"Ranked Chunks With Source Details.\"",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18",
@@ -396,11 +388,9 @@
       "cited": [
         "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18",
         "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18",
-        "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18",
         "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18"
       ],
       "excerpts": [
-        "Hybrid RAG Pipeline with Reranking",
         "RAG uses information from prepared documents to help an LLM answer the user\u2019s question",
         "Retrieval finds relevant candidate chunks using both keyword search and vector search in Hybrid RAG",
         "Reranking compares these candidates to the original question and prioritizes which chunks are supplied to the LLM as context"
@@ -418,10 +408,10 @@
       "question": "What port does Gradio serve an app on by default?",
       "type": "text",
       "expected": "Week 4 slide 7",
-      "latency_s": 2.593,
-      "retrieval_s": 0.802,
+      "latency_s": 1.999,
+      "retrieval_s": 0.778,
       "error": null,
-      "answer": "According to the \"Serving\" slide in the MBAX 6418 - Week 4 - Serving and Debugging v4.pptx presentation, Gradio serves an app on the default port 7860.",
+      "answer": "According to the \"Serving\" slide (page 7) in the MBAX 6418 - Week 4 - Serving and Debugging v4.pptx presentation, Gradio serves an app on the default port 7860.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p7",
@@ -449,10 +439,10 @@
       "question": "What port does Gradio serve an app on by default?",
       "type": "text",
       "expected": "Week 4 slide 7",
-      "latency_s": 4.199,
-      "retrieval_s": 2.821,
+      "latency_s": 4.539,
+      "retrieval_s": 2.88,
       "error": null,
-      "answer": "According to the \"Serving\" slide in the MBAX 6418 - Week 4 - Serving and Debugging v4.pptx presentation, Gradio serves an app on the default port 7860.",
+      "answer": "According to the \"Serving\" slide (page 7) in the \"MBAX 6418 - Week 4 - Serving and Debugging v4.pptx\" presentation, Gradio serves an app on the default port 7860. You can access the app locally using the URLs http://127.0.0.1:7860 or http://localhost:7860.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p7",
@@ -460,8 +450,7 @@
         "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p4",
         "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p6",
         "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p38",
-        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p8",
-        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p5"
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p8"
       ],
       "cited": [
         "[1] MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p7"
@@ -482,10 +471,10 @@
       "question": "What is semantic search typically based on?",
       "type": "text",
       "expected": "Week 5 slide 15",
-      "latency_s": 2.261,
-      "retrieval_s": 0.79,
+      "latency_s": 1.831,
+      "retrieval_s": 0.699,
       "error": null,
-      "answer": "According to the slide \"Semantic Search and Embeddings\" (page 15) in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation, semantic search is typically based on \"embeddings to numerically represent text, images, and other data\" [1].",
+      "answer": "According to the \"Semantic Search and Embeddings\" slide (page 15) in the MBAX 6418 Week 5 presentation, semantic search is typically based on **embeddings**. These embeddings are used to numerically represent text, images, and other data.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p15",
@@ -513,10 +502,10 @@
       "question": "What is semantic search typically based on?",
       "type": "text",
       "expected": "Week 5 slide 15",
-      "latency_s": 4.402,
-      "retrieval_s": 2.975,
+      "latency_s": 3.808,
+      "retrieval_s": 2.581,
       "error": null,
-      "answer": "According to the slide \"Semantic Search and Embeddings\" on page 15 of the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" presentation, semantic search is typically based on **embeddings**. The slide explains that these embeddings are used to \"numerically represent text, images, and other data.\"",
+      "answer": "Based on the slide \"Semantic Search and Embeddings\" (page 15) in the \"MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx\" presentation, semantic search is typically based on **embeddings**. The slide explains that these embeddings are used to \"numerically represent text, images, and other data\".",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p15",
@@ -544,10 +533,10 @@
       "question": "Name two common chunking strategies.",
       "type": "text",
       "expected": "Week 5 slide 17",
-      "latency_s": 2.756,
-      "retrieval_s": 0.807,
+      "latency_s": 2.45,
+      "retrieval_s": 0.78,
       "error": null,
-      "answer": "According to the slide \"Chunking: How Much Context Is Enough?\" in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation (slide/page 17), two common chunking strategies are:\n\n1. **Fixed size**: This involves creating chunks with a set size, often with overlap.\n2. **Recursive**: This strategy involves splitting at boundaries like paragraphs, and then dividing oversized chunks at finer boundaries like sentences.\n\nOther strategies mentioned include Document-based and Semantic chunking.",
+      "answer": "According to the \"Chunking: How Much Context Is Enough?\" slide in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation, two common chunking strategies are:\n\n1. **Fixed size**: This involves creating chunks with a set size, often with overlap.\n2. **Recursive**: This strategy splits content at boundaries like paragraphs, and then divides any oversized chunks at finer boundaries like sentences.\n\nOther strategies mentioned include Document-based and Semantic chunking.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p17",
@@ -559,10 +548,12 @@
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p8"
       ],
       "cited": [
+        "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p17",
         "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p17"
       ],
       "excerpts": [
-        "Common chunking strategies: Fixed size \u2013 chunks with a set size, often with overlap Recursive \u2013 split at boundaries like paragraphs, then divide oversized chunks at finer boundaries like sentences"
+        "Fixed size \u2013 chunks with a set size, often with overlap",
+        "Recursive \u2013 split at boundaries like paragraphs, then divide oversized chunks at finer boundaries like sentences"
       ],
       "images_shown": 4,
       "target_retrieved": true,
@@ -577,10 +568,10 @@
       "question": "Name two common chunking strategies.",
       "type": "text",
       "expected": "Week 5 slide 17",
-      "latency_s": 4.404,
-      "retrieval_s": 2.628,
+      "latency_s": 4.403,
+      "retrieval_s": 2.684,
       "error": null,
-      "answer": "According to the slide \"Chunking: How Much Context Is Enough?\" in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation, two common chunking strategies are:\n\n1. **Fixed size**: This involves creating chunks with a set size, often with overlap.\n2. **Recursive**: This strategy splits content at boundaries like paragraphs, and then divides any oversized chunks at finer boundaries like sentences.\n\nOther strategies mentioned include Document-based and Semantic chunking.",
+      "answer": "According to the slide \"Chunking: How Much Context Is Enough?\" in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation (slide 17), two common chunking strategies are:\n\n1. **Fixed size**: This involves creating chunks with a set size, often with overlap.\n2. **Recursive**: This strategy involves splitting at boundaries like paragraphs, and then dividing oversized chunks at finer boundaries like sentences.\n\nOther strategies mentioned include Document-based and Semantic chunking.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p17",
@@ -588,8 +579,8 @@
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16",
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p9",
         "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p17",
-        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p8",
-        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p9"
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p9",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p8"
       ],
       "cited": [
         "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p17",
@@ -612,8 +603,8 @@
       "question": "Who won the 2024 Super Bowl and by how much?",
       "type": "unanswerable",
       "expected": "(unanswerable)",
-      "latency_s": 2.124,
-      "retrieval_s": 0.701,
+      "latency_s": 2.15,
+      "retrieval_s": 0.893,
       "error": null,
       "answer": "I couldn't find enough supporting material in the loaded documents to answer this.",
       "found": false,
@@ -642,8 +633,8 @@
       "question": "Who won the 2024 Super Bowl and by how much?",
       "type": "unanswerable",
       "expected": "(unanswerable)",
-      "latency_s": 4.667,
-      "retrieval_s": 3.086,
+      "latency_s": 4.096,
+      "retrieval_s": 3.004,
       "error": null,
       "answer": "I couldn't find enough supporting material in the loaded documents to answer this.",
       "found": false,
@@ -672,10 +663,10 @@
       "question": "How is RAG context optimization different from fine-tuning?",
       "type": "text",
       "expected": "Week 5 slide 13",
-      "latency_s": 2.424,
-      "retrieval_s": 0.776,
+      "latency_s": 2.048,
+      "retrieval_s": 0.788,
       "error": null,
-      "answer": "According to the \"Context Optimization\" slide (MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx, page 13), the difference lies in what is being modified. RAG \"optimizes context by supplying relevant information when the model responds,\" whereas \"Fine-tuning adapts the model itself through additional training.\"",
+      "answer": "According to the \"Context Optimization\" slide in the MBAX 6418 Week 5 presentation, RAG and fine-tuning differ in how they improve model performance. RAG optimizes context by supplying relevant information when the model responds, whereas fine-tuning adapts the model itself through additional training.",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p13",
@@ -706,10 +697,10 @@
       "question": "How is RAG context optimization different from fine-tuning?",
       "type": "text",
       "expected": "Week 5 slide 13",
-      "latency_s": 4.157,
-      "retrieval_s": 2.601,
+      "latency_s": 4.078,
+      "retrieval_s": 2.781,
       "error": null,
-      "answer": "According to the \"Context Optimization\" slide in the MBAX 6418 Week 5 presentation, RAG and fine-tuning differ in their approach to model improvement. RAG \"optimizes context by supplying relevant information when the model responds,\" whereas \"Fine-tuning adapts the model itself through additional training.\"",
+      "answer": "According to the \"Context Optimization\" slide (slide 13) in the MBAX 6418 Week 5 presentation, the difference lies in what is being modified. RAG \"optimizes context by supplying relevant information when the model responds.\" In contrast, \"Fine-tuning adapts the model itself through additional training.\"",
       "found": true,
       "evidence": [
         "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p13",
