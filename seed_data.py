@@ -1,9 +1,13 @@
 import os
-os.environ.setdefault("COURSE_BUILD_MODE", os.environ.get("COURSE_BUILD_MODE", "local"))
+
+# Mode comes from the environment or .env (Settings). Do not set a default here:
+# os.environ.setdefault would run before .env is loaded and silently force local.
 from course_assistant.config.settings import Settings
 from course_assistant.factory import build_app_state
 
-app = build_app_state(Settings())
+settings = Settings()
+print("mode:", settings.build_mode)
+app = build_app_state(settings)
 for f in sorted(os.listdir("data/materials")):
     if f.lower().endswith((".pdf", ".pptx", ".txt", ".md")):
         r = app.catalog.add_file(f"data/materials/{f}")

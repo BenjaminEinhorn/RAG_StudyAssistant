@@ -38,16 +38,8 @@ def build_app_state(settings: Settings,
     """
     text_embed = build_text_embedder(settings)
     visual_embed = build_visual_embedder(settings)
-    # rerank_enabled=False routes to a pass-through/rank-by-score reranker
-    if rerank_enabled:
-        reranker = build_reranker(settings)
-    else:
-        from .services.reranker import Reranker
-
-        class _NoRerank(Reranker):
-            def rescore(self, query, documents):
-                return [0.0] * len(documents)   # keep original ordering
-        reranker = _NoRerank()
+    # rerank_enabled=False keeps the reciprocal-rank-fused keyword+vector order
+    reranker = build_reranker(settings) if rerank_enabled else None
     catalog = Catalog(settings, text_embed, visual_embed, reranker,
                       chunk_method=chunk_method)
     chat = build_chat(settings)

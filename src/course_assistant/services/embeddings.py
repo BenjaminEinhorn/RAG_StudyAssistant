@@ -1,25 +1,36 @@
 """Embedding providers.
 
-Text and visual embeddings are produced by class services (OpenAI-compatible
-/v1 embeddings endpoints). A deterministic :class:`LocalHashEmbeddings` fallback
-is used for offline unit/e2e testing until real keys are configured; it is not
-(for the comparison) a production embedding — see README.
+Text and visual embeddings come from separate class services with different
+wire formats (both verified with ``probe_endpoints.py``):
+
+- :class:`ClassTextEmbeddings` — 9002, Cohere-style ``POST /v2/embed`` with
+  ``input_type`` ``document`` (chunks) or ``query`` (questions).
+- :class:`ClassVisualEmbeddings` — 9003, ``POST /v1/embeddings`` with a
+  chat-style ``messages`` payload. The same model embeds slide images *and*
+  text queries into one space, which is what visual retrieval relies on. The
+  OpenAI ``input=[data-uri]`` form is accepted by the server but tokenises the
+  base64 string as text, so it is never used.
+
+Failures raise :class:`ServiceError`; nothing degrades to a fake vector.
+A deterministic :class:`LocalHashEmbeddings` is used for offline tests only.
 """
 from __future__ import annotations
 
 import hashlib
 from abc import ABC, abstractmethod
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 from ..config.settings import Settings
+from .http import ServiceError, image_data_uri, post_json
 
 
 class EmbeddingProvider(ABC):
     dim: int
+    name: str = "unknown"   # recorded on the Chroma collection that it fills
 
     @abstractmethod
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """Return a [n, dim] list of vectors for the given texts."""
+        """Return a [n, dim] list of vectors for documents/chunks."""
         raise NotImplementedError
 
     @abstractmethod
@@ -27,48 +38,85 @@ class EmbeddingProvider(ABC):
         """Return vectors for images (file paths), used for the visual index."""
         raise NotImplementedError
 
-
-def _client(base_url: str, api_key: str):
-    from openai import OpenAI
-
-    return OpenAI(base_url=base_url.rstrip("/"), api_key=api_key, timeout=60)
+    def embed_query(self, text: str) -> list[float]:
+        """Vector for a search query (asymmetric models embed queries differently)."""
+        return self.embed_texts([text])[0]
 
 
-class OpenAIEmbeddings(EmbeddingProvider):
-    """Text embeddings via a class OpenAI-compatible endpoint."""
+def _check_dim(vectors: list[list[float]], dim: int, what: str) -> list[list[float]]:
+    bad = {len(v) for v in vectors if len(v) != dim}
+    if dim and bad:
+        raise ServiceError(f"{what} returned dimension {sorted(bad)}, expected {dim} "
+                           "(check COURSE_EMBED_DIM / COURSE_VISUAL_EMBED_DIM).")
+    return vectors
 
-    def __init__(self, base_url: str, model: str, api_key: str, dim: int = 0):
-        self.base_url, self.model, self.api_key = base_url, model, api_key
-        self._client = _client(base_url, api_key)
-        self.dim = dim
+
+class ClassTextEmbeddings(EmbeddingProvider):
+    """Text embeddings via the class ``/v2/embed`` endpoint (port 9002)."""
+
+    batch_size = 32
+
+    def __init__(self, base_url: str, model: str, api_key: str, dim: int):
+        self.url = base_url.rstrip("/") + "/v2/embed"
+        self.model, self.api_key, self.dim = model, api_key, dim
+        self.name = model
+
+    def _embed(self, texts: list[str], input_type: str) -> list[list[float]]:
+        out: list[list[float]] = []
+        for i in range(0, len(texts), self.batch_size):
+            batch = texts[i:i + self.batch_size]
+            data = post_json(self.url, {
+                "model": self.model, "texts": batch, "input_type": input_type,
+                "embedding_types": ["float"]}, self.api_key)
+            vecs = (data.get("embeddings") or {}).get("float")
+            if not isinstance(vecs, list) or len(vecs) != len(batch):
+                raise ServiceError(f"{self.url} returned an unexpected shape "
+                                   f"(keys={sorted(data)}).")
+            out.extend(vecs)
+        return _check_dim(out, self.dim, "text embedder")
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        resp = self._client.embeddings.create(model=self.model, input=texts)
-        vectors = [d.embedding for d in resp.data]
-        # order safety, though the API returns in request order
-        vectors = [v for _, v in sorted(zip([d.index for d in resp.data], vectors))]
-        if self.dim:
-            assert all(len(v) == self.dim for v in vectors), "embedding dim mismatch"
-        return vectors
+        return self._embed(texts, "document")
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._embed([text], "query")[0]
 
     def embed_images(self, image_paths: list[str]) -> list[list[float]]:
-        # OpenAI's text-embedding API can also take images as data URIs on some
-        # class endpoints. Try data-URI first; fall back to a per-file prompt
-        # wrapper if the endpoint rejects the image payload.
-        import base64
+        raise ServiceError("The text embedder cannot embed images; use the visual embedder.")
 
-        def uri(p: str) -> str:
-            b = Path(p).read_bytes()
-            return "data:image/png;base64," + base64.b64encode(b).decode()
 
+class ClassVisualEmbeddings(EmbeddingProvider):
+    """Image (and query-text) embeddings via the class 9003 endpoint."""
+
+    workers = 8
+
+    def __init__(self, base_url: str, model: str, api_key: str, dim: int):
+        self.url = base_url.rstrip("/") + "/embeddings"
+        self.model, self.api_key, self.dim = model, api_key, dim
+        self.name = model
+
+    def _embed_content(self, content: list[dict]) -> list[float]:
+        data = post_json(self.url, {
+            "model": self.model, "encoding_format": "float",
+            "messages": [{"role": "user", "content": content}]}, self.api_key)
         try:
-            resp = self._client.embeddings.create(
-                model=self.model, input=[uri(p) for p in image_paths], input_type=None
-            )
-            return [d.embedding for d in resp.data]
-        except Exception:
-            # Some class endpoints expect a text prompt describing the image.
-            return self.embed_texts([f"[image at {p}]" for p in image_paths])
+            vec = data["data"][0]["embedding"]
+        except (KeyError, IndexError, TypeError):
+            raise ServiceError(f"{self.url} returned an unexpected shape "
+                               f"(keys={sorted(data)}).") from None
+        return _check_dim([vec], self.dim, "visual embedder")[0]
+
+    def embed_images(self, image_paths: list[str]) -> list[list[float]]:
+        # one image per request (a messages payload is a single input)
+        def one(path: str) -> list[float]:
+            return self._embed_content(
+                [{"type": "image_url", "image_url": {"url": image_data_uri(path)}}])
+
+        with ThreadPoolExecutor(self.workers) as pool:
+            return list(pool.map(one, image_paths))
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        return [self._embed_content([{"type": "text", "text": t}]) for t in texts]
 
 
 class LocalHashEmbeddings(EmbeddingProvider):
@@ -78,8 +126,9 @@ class LocalHashEmbeddings(EmbeddingProvider):
     ordering is reproducible even with no live service. NOT semantic.
     """
 
-    def __init__(self, dim: int = 1536):
+    def __init__(self, dim: int = 2048):
         self.dim = dim
+        self.name = f"local-hash-{dim}"
 
     def _vec(self, s: str) -> list[float]:
         h = hashlib.blake2b(s.encode("utf-8"), digest_size=8).digest()
@@ -102,12 +151,12 @@ class LocalHashEmbeddings(EmbeddingProvider):
 def build_text_embedder(settings: Settings) -> EmbeddingProvider:
     if settings.build_mode == "local":
         return LocalHashEmbeddings(settings.embed_dim)
-    return OpenAIEmbeddings(settings.text_embed_base_url, settings.text_embed_model,
-                            settings.llm_api_key, settings.embed_dim)
+    return ClassTextEmbeddings(settings.text_embed_base_url, settings.text_embed_model,
+                               settings.api_key, settings.embed_dim)
 
 
 def build_visual_embedder(settings: Settings) -> EmbeddingProvider:
     if settings.build_mode == "local":
-        return LocalHashEmbeddings(settings.embed_dim)
-    return OpenAIEmbeddings(settings.visual_embed_base_url, settings.visual_embed_model,
-                            settings.llm_api_key, 0)
+        return LocalHashEmbeddings(settings.visual_embed_dim)
+    return ClassVisualEmbeddings(settings.visual_embed_base_url, settings.visual_embed_model,
+                                 settings.api_key, settings.visual_embed_dim)

@@ -10,18 +10,23 @@ endpoints.
 
 ## Screenshots
 
-Ask — answer with the retrieved **"Vibe Coding on Prod"** slide (Week 2, slide 33) shown as evidence:
+All captured against the **live class services** (`COURSE_BUILD_MODE=full`).
+
+Ask — a visual question answered from the retrieved **"Vibe Coding on Prod"**
+slide (Week 2, slide 33). The answer describes the image, the citation's quote
+is verified against the slide text, and the gallery shows the cited slide first
+with its slide number and document name:
 
 ![Answer with supporting slide image](docs/screenshot-answer-with-slide.png)
 
-Quiz — scored feedback with explanations and cited sources (real quiz generated
-offline from the Week 5 deck):
+Quiz — scored feedback against the hidden key, with an explanation, the source
+slide and a verbatim excerpt for every question:
 
 ![Quiz feedback with sources](docs/screenshot-quiz-feedback.png)
 
-App in light mode (light/dark both verified — app follows OS/browser color scheme):
+Dark mode (the app follows the OS/browser color scheme; both were checked):
 
-![Ask tab, light mode](docs/screenshot-ask-light.png)
+![Ask tab, dark mode](docs/screenshot-answer-dark.png)
 
 ## Architecture
 
@@ -42,62 +47,78 @@ slide image path, so any chunk that matches can show the supporting slide.
 
 **Step 3 — Indexing: text and visual kept separate** (`core/index.py`)
 - **Text index** — each chunk goes into a **bm25s** keyword index *and* a
-  Chroma vector store (text embeddings from the class endpoint).
+  Chroma vector store (Nemotron text embeddings, `input_type=document`).
 - **Visual index** — a separate Chroma collection of slide-**image** embeddings
-  (visual embeddings from the class endpoint) so visual/diagram questions
-  retrieve the actual slides.
-A JSONL chunk registry and the PNG renders persist under `./data` (gitignored);
-embeddings live in Chroma's persistent store (`data/chroma`).
+  (Qwen3-VL-Embedding). The same model embeds the typed question into the
+  image space, so visual/diagram questions retrieve the actual slide.
+Each collection records which embedder filled it; opening it with a different
+embedder (e.g. an index built offline, opened live) is refused rather than
+silently mixing incomparable vectors. PNG renders and the JSONL chunk registry
+persist under `./data` (gitignored).
 
-**Step 4 — Retrieval → rerank → answer** (`core/assistant.py`)
-A query is run through keyword + text-vector + visual-image retrieval, the
-candidate chunk ids are merged and deduped, then **reranked** (class reranker;
-lexical fallback offline). The best evidence — including the relevant slide
-*images* — is sent to the class vision LLM with instructions to answer only
-from that evidence, producing structured output with separate `answer` and
-`sources` fields. `core/quiz.py` builds MCQs from the same retrieval with a
-hidden answer key, scoring, and explanations that cite their slide source.
+**Step 4 — Retrieval → rerank → answer** (`core/index.py`, `core/assistant.py`)
+Keyword and text-vector candidates (20 from each) are merged by
+**reciprocal-rank fusion**, then **reranked** by the class multimodal reranker;
+slide images from the visual index are reranked the same way. The best evidence
+— including up to four slide *images* — goes to the class vision LLM, which must
+reply with schema-constrained JSON `{found, answer, citations: [{source,
+excerpt}]}`. Every citation is then checked in code: the cited number must be an
+item retrieval actually returned, and the quoted excerpt must occur in that
+chunk's text (or, with no quote, the model must have been shown that slide's
+image). Only verified citations are listed as `sources`; anything else is
+flagged in the UI. `core/quiz.py` builds MCQs from the same retrieval: each
+question cites the excerpt it comes from, the key stays server-side until the
+student grades or asks for answers, and scoring is a pure function of that key.
 
 ## Class services
 
-The app itself (Gradio + prep + indexing + retrieval) runs locally; the models
-run on the **class endpoints at `http://dobolyi.com:9001+`** (OpenAI-compatible
-`/v1`). Keys are read from the environment or a local `.env` (gitignored) and
-**never appear in the UI, logs, or this repo** — `.env.example` ships dummy
-values only.
+The app itself (Gradio, parsing, indexing, retrieval) runs locally; the models
+run on the class endpoints. The contract below was **verified against the live
+services** with `probe_endpoints.py` (full transcript, key redacted:
+[`docs/endpoint-probe-output.txt`](docs/endpoint-probe-output.txt)).
 
-| Var | Purpose | Class default |
-|---|---|---|
-| `COURSE_LLM_BASE_URL` / `COURSE_LLM_MODEL` | vision-capable answer LLM | `http://dobolyi.com:9001/v1` |
-| `COURSE_TEXT_EMBED_BASE_URL` / `_MODEL` | text embeddings | `:9002/v1` |
-| `COURSE_VISUAL_EMBED_BASE_URL` / `_MODEL` | image embeddings | `:9003/v1` |
-| `COURSE_RERANK_BASE_URL` / `_MODEL` | text/multimodal reranker | `:9004/v1` |
-| `COURSE_PARSE_BASE_URL` (optional) | doc-parsing service | `:9005/v1` |
-| `COURSE_API_KEY` | bearer key for the above | `dummy` |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | text chunking | `1200` / `150` |
-| `COURSE_BUILD_MODE` | `local` (offline) or `full` (live services) | `local` |
+| Port | Model (`GET /v1/models`) | Call that works | Notes |
+|---|---|---|---|
+| 9001 | `cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit` | `POST /v1/chat/completions` | Reasoning model: without `chat_template_kwargs: {enable_thinking: false}` it returns `content: null`. `json_schema` response format is honoured; image parts work. 64k context. |
+| 9002 | `nvidia/Nemotron-3-Embed-1B-BF16` | `POST /v2/embed` `{texts, input_type: document\|query}` | 2048-d. `search_document` is rejected (HTTP 400). |
+| 9003 | `Qwen/Qwen3-VL-Embedding-2B` | `POST /v1/embeddings` with chat-style `messages` | 2048-d. Embeds **images and text** into one space. `input: [data-uri]` returns 200 but embeds the base64 *string* as text (2055 tokens vs 78), so it is never used. |
+| 9004 | `Qwen/Qwen3-VL-Reranker-2B` | `POST /rerank` `{query, documents}` | Text docs as strings; each image must be its own `{content: [image_url]}` document. |
+| 9005 | `dots.mocr` | `POST /v1/chat/completions` with an image | OCR model; not used by the default PyMuPDF parser. |
 
-> Confirm exact ports/models with your professor. Without live keys,
-> `COURSE_BUILD_MODE=local` keeps the app fully usable (retrieval, evidence,
-> offline questions) so it runs out of the box; answers use a local fallback and
-> quiz questions are generated deterministically from the slides until the live
-> LLM is configured.
+Settings (defaults already match the table; see `.env.example`):
+
+| Var | Purpose |
+|---|---|
+| `COURSE_API_KEY` | bearer key for all services — only in your local `.env` |
+| `COURSE_BUILD_MODE` | `full` (live services) or `local` (offline stubs for tests — **not semantic**) |
+| `COURSE_LLM_BASE_URL` / `COURSE_LLM_MODEL` | answer + quiz LLM (:9001) |
+| `COURSE_TEXT_EMBED_BASE_URL` / `_MODEL`, `COURSE_EMBED_DIM` | text embeddings (:9002), 2048 |
+| `COURSE_VISUAL_EMBED_BASE_URL` / `_MODEL`, `COURSE_VISUAL_EMBED_DIM` | visual embeddings (:9003), 2048 |
+| `COURSE_RERANK_BASE_URL` / `_MODEL` | reranker (:9004) |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | text chunking, `1200` / `150` |
+
+Any service error is raised as a `ServiceError` with the key redacted and shown
+in the UI; no client silently degrades to a fake vector, a lexical score, or a
+blank answer.
 
 ## Data
 
 - `data/materials/` — course decks to ingest (not committed; add yours).
 - `data/images/` — rendered slide PNGs, one per page (gitignored).
 - `data/text_chunks.jsonl`, `data/chroma/` — chunk registry + vector stores.
-- `results/comparison.json` — RAG comparison results (committed).
+- `results/comparison.{json,csv}` and `results/replicate/` — rerank on/off
+  comparison (committed; CSV has the human-grading columns).
 - `seed_data.py` — ingests the course decks present in `data/materials`.
 
 ## Setup
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt    # or: pip install -e ".[dev]"
-cp .env.example .env                          # fill in class endpoints + key (never commit)
-python seed_data.py                           # optional: ingest bundled decks
+.venv/bin/pip install -e ".[dev]"
+cp .env.example .env                 # put the class key in COURSE_API_KEY (never commit)
+.venv/bin/python probe_endpoints.py  # optional: confirm the services answer
+# put the course decks (.pptx) in data/materials/, then:
+.venv/bin/python seed_data.py        # ingest them (~15 s for 3 decks once LibreOffice has converted them)
 .venv/bin/python -m course_assistant.ui.app   # -> http://127.0.0.1:7860
 ```
 
@@ -120,84 +141,131 @@ Requires Python 3.11+ and **LibreOffice** for PPTX→PDF
 - **Light / dark** — both render correctly (app follows your OS/browser color
   scheme).
 
-## Evaluation & comparison
+## Evaluation: rerank on vs off
 
-Question set (covers slide text + syllabus; ≥2 visual; 1 unanswerable):
+**Design choice compared:** whether the class reranker rescores the fused
+keyword + vector candidates (and the visual-index slides), or the
+reciprocal-rank-fused order is used as-is. One axis only.
+
+**Method** (`eval_compare.py`): both arms run the **full answer stage** against
+the live services over the same fixed question set and the same index (three
+decks, 92 slides, ingested once). Arm order alternates per question and an
+untimed warm-up call runs first. Per question it records mechanically whether
+the ground-truth slide was in the evidence and was cited, whether every cited
+source is a retrieved item, whether every quoted excerpt occurs in its cited
+chunk, and end-to-end wall-clock latency. **Answer correctness and whether the
+sources support the answer are left for a human** — empty `correct` and
+`sources_support` columns in
+[`results/comparison.csv`](results/comparison.csv); an LLM grading its own
+retrieval is not evidence. The script refuses to run offline unless passed
+`--offline`, and then writes to a file named `..._OFFLINE_not_a_result`.
 
 | # | Question | Type | Expected |
 |---|---|---|---|
-| 1 | What is retrieval-augmented generation (RAG)? | text | W5 · slide 10 |
-| 2 | Why use RAG? (benefits over training data) | text | W5 · slide 11 |
+| 1 | What is retrieval augmented generation (RAG)? | text | W5 · slide 10 |
+| 2 | Why use RAG? Give the benefits over training data. | text | W5 · slide 11 |
 | 3 | What two components does hybrid RAG combine? | text | W5 · slide 18 |
-| 4 | What does the *Vibe Coding on Prod* meme show? | **visual** | W2 · slide 33 |
-| 5 | Describe the hybrid-RAG pipeline diagram | **visual** | W5 · slide 18 |
-| 6 | What port does Gradio serve on by default? | text | W4 · slide 7 |
+| 4 | What does the 'Vibe Coding on Prod' meme show? | **visual** | W2 · slide 33 |
+| 5 | Describe what the hybrid RAG pipeline diagram shows. | **visual** | W5 · slide 18 |
+| 6 | What port does Gradio serve an app on by default? | text | W4 · slide 7 |
 | 7 | What is semantic search typically based on? | text | W5 · slide 15 |
-| 8 | Name two common chunking strategies | text | W5 · slide 17 |
+| 8 | Name two common chunking strategies. | text | W5 · slide 17 |
 | 9 | Who won the 2024 Super Bowl and by how much? | **unanswerable** | — |
-| 10 | How does RAG context optimization differ from fine-tuning? | text | W5 · slide 13 |
+| 10 | How is RAG context optimization different from fine-tuning? | text | W5 · slide 13 |
 
-Results (same questions, same files; retrieval-correct = target slide in the
-top-3, mean end-to-end query latency) — full rows in `results/comparison.json`:
+**Results** — two full runs on 2026-09-18 (main: `results/comparison.*`,
+replicate: `results/replicate/comparison.*`). Latency is end-to-end per question
+(n = 10 per arm per run); retrieval is the part spent in text + visual search.
 
-| Config | Retrieval correct (top-3) | Mean latency | Unanswerable → top-1 |
-|---|---|---|---|
-| rerank on · recursive chunking | **9/10** | 1.5 ms | slide 8 (spurious) |
-| rerank off · recursive chunking | 9/10 | 1.2 ms | slide 8 (spurious) |
-| rerank on · fixed chunking | 9/10 | 1.3 ms | slide 8 (spurious) |
+| Metric | rerank on (main / replicate) | rerank off (main / replicate) |
+|---|---|---|
+| Target slide in evidence (9 answerable) | 9/9 · 9/9 | 9/9 · 9/9 |
+| Target slide cited | 9/9 · 9/9 | 9/9 · 9/9 |
+| Every cited source was retrieved | 9/9 · 9/9 | 9/9 · 9/9 |
+| Every quoted excerpt found in its chunk | 9/9 · 9/9 | 8/9 · 9/9 |
+| Unanswerable question refused, no citation | 1/1 · 1/1 | 1/1 · 1/1 |
+| Median latency | 4.67 s · 4.40 s | 2.76 s · 2.45 s |
+| Mean latency | 4.60 s · 4.50 s | 2.75 s · 2.42 s |
+| Median retrieval time | 2.69 s · 2.88 s | 0.79 s · 0.79 s |
 
-**Interpretation.** All three configs recover the target slide for the 9
-answerable questions, so we keep **rerank on + recursive chunking**: it is the
-architecturally correct hybrid pipeline described in class, reranking will
-separate strong from weak candidates once real semantic embeddings are enabled,
-and recursive (paragraph-aware) chunking keeps topic sentences intact versus
-fixed splits that break mid-sentence — at negligible latency overhead (~0.3 ms).
-The unanswerable control still returns a spurious top-1 slide offline because
-hash embeddings always return *something*; this is exactly why missing-info
-detection is handled in the answer stage (which needs the live semantic LLM). It
-is a documented limitation, not a fabricated success.
+In the main run the target slide was the **top-ranked** evidence item in every
+answerable question with rerank on; with rerank off it was top-ranked in 8/9
+and second in one (Q1).
+
+**Interpretation — a null result on quality, a clear cost in latency.** On this
+question set, hybrid retrieval with reciprocal-rank fusion already puts the
+ground-truth slide into the evidence for every answerable question, and the LLM
+cites it every time, so the reranker has nothing measurable left to fix. Its only
+visible effect is ordering (one target moved from rank 2 to rank 1). It costs
+about **+1.9–2.0 s per question** (≈70% more end-to-end time), almost all of it
+in the retrieval stage, because it scores ~20–40 text candidates plus up to six
+slide images per query. The single excerpt miss (rerank off, Q2, main run) is
+not a retrieval difference: the model correctly quoted text from the "Benefits
+of RAG" graphic on slide 11, which exists only as pixels, so the text-only
+checker could not find it; the replicate shows 9/9 for both arms.
+
+What this does **not** show: ten questions, mostly with one obvious target slide,
+cannot distinguish two arms that both score at the ceiling. The reranker may
+still help on harder, ambiguous questions or a larger corpus; that needs a
+larger question set to test. We keep **rerank on** as the default for the
+multimodal ordering of slide images, but on this evidence a latency-sensitive
+deployment could turn it off at no measured loss. Human grading of the
+`correct` / `sources_support` columns is still to be filled in by the team.
+
+Earlier versions of this README reported 9/10 for three configs at 1–4 ms.
+Those numbers came from offline hash embeddings with the answer stage never
+called, and have been withdrawn.
 
 ## Testing
 
 ```bash
-.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest -q                               # offline, no key needed
+COURSE_BUILD_MODE=full .venv/bin/python smoke_full.py       # live ingest check
 ```
 
-25 tests: parsing (incl. a real PPTX → slide images), chunking, add/dedupe/
-remove/visual-search, structured answer/sources, missing-info refusal, quiz
-scoring + hidden key, plus end-to-end handler workflows. Deck-dependent tests
-auto-skip on a fresh clone; the served app is also verified over its real HTTP
-event API (`/ask` returns the grounded answer + the slide-33 image).
+The suite runs offline: parsing (incl. a real PPTX → slide images), chunking,
+add/dedupe/remove, the embedder-mismatch guard, citation verification (a
+fabricated quote or an out-of-range source is rejected), service clients against
+faked transports (images sent as `messages`, thinking disabled, failures raise
+instead of degrading), quiz generation/scoring/hidden key, and end-to-end UI
+handler flows. The end-to-end module skips when gradio is not installed, and
+deck-dependent tests skip when `data/materials` has no decks.
+`smoke_full.py` ingests a real deck live and checks both collections hold 2048-d
+vectors that differ between slides.
 
 ## Limitations
 
-- Real semantic retrieval (visual embeddings, class reranker, vision LLM) is
-  stubbed offline (`COURSE_BUILD_MODE=local`) pending live keys.
-- `.pptx` text comes from the LibreOffice-rendered PDF text layer; very
-  image-heavy slides yield little text (the visual index compensates by showing
-  the actual slide).
-- Offline retrieval can't detect "no evidence" semantically — handled in the
-  answer stage; needs the live LLM to be reliable.
-- No auth — course use only.
+- Slide text comes from the PDF text layer. Text that exists only inside
+  images (e.g. the "Benefits of RAG" graphic on Week 5 slide 11) is visible to
+  the vision LLM and the visual index but not to BM25, the text index, or the
+  excerpt checker. OCR with the class `dots.mocr` service (:9005) at ingest would
+  close this gap; not done yet.
+- Excerpt verification proves a quote exists in the cited chunk, not that the
+  quote supports the claim. That judgement is the human `sources_support` column.
+- The evaluation is small (10 questions, 2 runs); see the interpretation above.
+- No auth; one shared quiz state per server process. Course use only.
 
 ## Files
 
 ```
 src/course_assistant/
-  config/settings.py      env + .env (secrets), dummy defaults
-  services/               OpenAI-compatible clients + local fallbacks
+  config/settings.py      env + .env (secrets), verified service defaults, redact()
+  services/               class-service clients + offline stand-ins
+    http.py               shared POST + ServiceError + image encoding
     embeddings.py chat.py reranker.py
   core/
     parsing.py            uploads -> pages + rendered slide images (LibreOffice)
     chunking.py           recursive / fixed chunkers
-    index.py              BM25 + Chroma text & visual indexes, dedupe/remove
-    assistant.py          retrieval -> evidence -> {answer, sources}
+    index.py              BM25 + Chroma text & visual indexes, RRF, rerank, dedupe/remove
+    assistant.py          retrieval -> evidence -> {answer, citations} + verification
     quiz.py               grounded MCQs, hidden key, scoring
   ui/app.py               Gradio UI (Ask / Quiz / Documents)
   factory.py              composition root (no Gradio dep), testable
 tests/                    unit + e2e (offline)
-eval_compare.py           the comparison above -> results/comparison.json
+probe_endpoints.py        prints the live request/response contract of :9001-:9005
+smoke_full.py             live ingest check for one deck
+eval_compare.py           rerank on/off comparison -> results/
+seed_data.py              ingests the decks in data/materials
 diagram.svg               architecture diagram (embedded above)
-docs/                     screenshots
-requirements.txt          install deps
+docs/                     screenshots + endpoint probe transcript
 ```

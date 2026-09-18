@@ -50,13 +50,13 @@
   <text x="402" y="140" fill="#f0a94e" font-size="13" font-weight="700">TEXT INDEX (separate)</text>
   <text x="402" y="162" fill="#e6e6e6" font-size="12">- bm25s keyword index (tokenized chunks)</text>
   <text x="402" y="181" fill="#e6e6e6" font-size="12">- Chroma vector store · text embeddings</text>
-  <text x="402" y="200" fill="#9aa4b1" font-size="11">  ← class text-embedding /v1 endpoint (remote)</text>
+  <text x="402" y="200" fill="#9aa4b1" font-size="11">  ← :9002 Nemotron /v2/embed (query|document)</text>
   <text x="402" y="218" fill="#9aa4b1" font-size="11">  metadata: doc_id · doc_name · slide · image_path</text>
 
   <rect x="388" y="250" width="440" height="100" rx="12" fill="#151a21" stroke="#2a2f38"/>
   <text x="402" y="272" fill="#f0a94e" font-size="13" font-weight="700">VISUAL INDEX (separate)</text>
   <text x="402" y="294" fill="#e6e6e6" font-size="12">- Chroma collection of slide-image embeddings</text>
-  <text x="402" y="313" fill="#9aa4b1" font-size="11">  ← class visual-embedding /v1 endpoint (remote)</text>
+  <text x="402" y="313" fill="#9aa4b1" font-size="11">  ← :9003 Qwen3-VL-Embedding (images + text queries)</text>
   <text x="402" y="331" fill="#9aa4b1" font-size="11">  enables image/slide retrieval for diagram questions</text>
 
   <text x="388" y="378" fill="#9aa4b1" font-size="12">JSONL chunk registry + PNG renders persist in ./data (gitignored)</text>
@@ -65,13 +65,13 @@
   <rect x="856" y="118" width="400" height="76" rx="12" fill="#151a21" stroke="#2a2f38"/>
   <text x="870" y="140" fill="#f0a94e" font-size="12" font-weight="700">HYBRID RETRIEVE</text>
   <text x="870" y="161" fill="#e6e6e6" font-size="12">keyword (bm25) ∪ text-vector ∪ visual-image</text>
-  <text x="870" y="180" fill="#9aa4b1" font-size="11">candidate chunk ids merged + deduped</text>
+  <text x="870" y="180" fill="#9aa4b1" font-size="11">reciprocal-rank fusion of keyword + text-vector</text>
 
   <line x1="1056" y1="194" x2="1056" y2="214" stroke="#e0a24b" stroke-width="2" marker-end="url(#arr)"/>
 
   <rect x="856" y="216" width="400" height="62" rx="12" fill="#151a21" stroke="#2a2f38"/>
   <text x="870" y="238" fill="#e6e6e6" font-size="12" font-weight="600">RERANK candidates</text>
-  <text x="870" y="256" fill="#9aa4b1" font-size="11">class rerank /v1 · fallback lexical reranker</text>
+  <text x="870" y="256" fill="#9aa4b1" font-size="11">class reranker :9004 (text + slide images) · no silent fallback</text>
 
   <line x1="1056" y1="278" x2="1056" y2="298" stroke="#e0a24b" stroke-width="2" marker-end="url(#arr)"/>
 
@@ -79,7 +79,7 @@
   <text x="870" y="322" fill="#e6e6e6" font-size="12" font-weight="600">ANSWER GENERATION (vision LLM, remote)</text>
   <text x="870" y="342" fill="#9aa4b1" font-size="11">prompt = top evidence + source refs; slide images</text>
   <text x="870" y="360" fill="#9aa4b1" font-size="11">sent as vision input when relevant</text>
-  <text x="870" y="378" fill="#9aa4b1" font-size="11">→ structured output: {answer, sources[...]}</text>
+  <text x="870" y="378" fill="#9aa4b1" font-size="11">→ JSON {found, answer, citations} · citations verified in code</text>
 
   <line x1="1056" y1="392" x2="1056" y2="412" stroke="#e0a24b" stroke-width="2" marker-end="url(#arr)"/>
 
@@ -96,7 +96,7 @@
   <text x="40" y="584" fill="#f0a94e" font-size="13" font-weight="700">Configuration (.env — secrets never committed)</text>
   <text x="40" y="606" fill="#e6e6e6" font-size="12">COURSE_LLM_BASE_URL (vision LLM, :9001) · COURSE_TEXT_EMBED_BASE_URL (:9002) · COURSE_VISUAL_EMBED_BASE_URL (:9003) ·</text>
   <text x="40" y="626" fill="#e6e6e6" font-size="12">COURSE_RERANK_BASE_URL (:9004) · COURSE_PARSE_BASE_URL (:9005) · COURSE_API_KEY · CHUNK_SIZE / CHUNK_OVERLAP · COURSE_BUILD_MODE (local|full)</text>
-  <text x="40" y="644" fill="#9aa4b1" font-size="11">All class services OpenAI-compatible /v1; exact models/ports per class documentation (dummy values in .env.example).</text>
+  <text x="40" y="644" fill="#9aa4b1" font-size="11">Contract verified live by probe_endpoints.py (vLLM 0.29.0); key placeholder only in .env.example.</text>
 
   <rect x="24" y="470" width="804" height="60" rx="12" fill="#151a21" stroke="#2a2f38"/>
   <text x="40" y="492" fill="#e6e6e6" font-size="13" font-weight="600">Quiz generation (same retrieval)</text>

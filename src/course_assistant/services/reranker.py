@@ -1,12 +1,12 @@
 """Reranker for combining keyword + vector candidates.
 
 Two implementations:
-- :class:`OpenAIReranker` — hits a class /v1/rerank style endpoint when one is
-  configured; falls back to a robust lexical boost when the endpoint isn't a
-  rerank service.
-- :class:`LexicalReranker` — a lightweight quadratic/lexical rerank used in
-  ``COURSE_BUILD_MODE=local`` and as the fallback so the answer quality
-  comparison (rerank on vs. off) is testable offline.
+- :class:`ClassReranker` — the class multimodal reranker (port 9004,
+  ``POST /rerank``). Scores text chunks and slide images against the query.
+  Errors raise :class:`ServiceError`: a silent fallback would make the
+  rerank-on arm of the evaluation quietly measure a different algorithm.
+- :class:`LexicalReranker` — term-overlap scoring used only in
+  ``COURSE_BUILD_MODE=local`` so the pipeline is testable offline.
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ import re
 from abc import ABC, abstractmethod
 
 from ..config.settings import Settings
+from .http import ServiceError, image_data_uri, post_json
 
 
 class Reranker(ABC):
@@ -21,6 +22,10 @@ class Reranker(ABC):
     def rescore(self, query: str, documents: list[str]) -> list[float]:
         """Return one score per document (higher = more relevant)."""
         raise NotImplementedError
+
+    def rescore_images(self, query: str, image_paths: list[str]) -> list[float] | None:
+        """One score per image, or None if this reranker cannot see images."""
+        return None
 
 
 def _tokens(text: str) -> set[str]:
@@ -41,48 +46,47 @@ class LexicalReranker(Reranker):
         for d in documents:
             dt = _tokens(d)
             overlap = len(qt & dt)
-            # normalize by query size; slight boost for exact query phrases
+            # normalize by query size
             scores.append(overlap / (len(qt) ** 0.6))
         return scores
 
 
-class OpenAIReranker(Reranker):
-    """Try a dedicated rerank endpoint; fall back to LexicalReranker."""
+class ClassReranker(Reranker):
+    """The class multimodal reranker (Qwen3-VL-Reranker)."""
 
     def __init__(self, base_url: str, model: str, api_key: str):
-        import httpx
-
-        self._http = httpx.Client(timeout=60)
         self.url = base_url.rstrip("/") + "/rerank"
-        self.model, self.api_key, self.headers = (
-            model, api_key, {"Authorization": f"Bearer {api_key}",
-                             "Content-Type": "application/json"},
-        )
-        self._fallback = LexicalReranker()
+        self.model, self.api_key = model, api_key
+
+    def _scores(self, query: str, documents: list, n: int) -> list[float]:
+        data = post_json(self.url, {"model": self.model, "query": query,
+                                    "documents": documents}, self.api_key)
+        results = data.get("results")
+        if not isinstance(results, list) or len(results) != n:
+            raise ServiceError(f"{self.url} returned {len(results or [])} results "
+                               f"for {n} documents.")
+        scores = [0.0] * n
+        for item in results:
+            scores[int(item["index"])] = float(item["relevance_score"])
+        return scores
 
     def rescore(self, query: str, documents: list[str]) -> list[float]:
-        try:
-            r = self._http.post(
-                self.url,
-                headers=self.headers,
-                json={"model": self.model, "query": query, "documents": documents},
-                timeout=60,
-            )
-            r.raise_for_status()
-            data = r.json()
-            scores = [0.0] * len(documents)
-            for item in data.get("results", []):
-                idx, score = item.get("index"), item.get("relevance_score", 0.0)
-                if idx is not None and 0 <= int(idx) < len(scores):
-                    scores[int(idx)] = float(score)
-            return scores
-        except Exception:
-            # endpoint may be chat-only; degrade gracefully
-            return self._fallback.rescore(query, documents)
+        if not documents:
+            return []
+        return self._scores(query, documents, len(documents))
+
+    def rescore_images(self, query: str, image_paths: list[str]) -> list[float]:
+        if not image_paths:
+            return []
+        # each image must be its own document; a single {"content": [...]}
+        # holding several images is scored as ONE document.
+        docs = [{"content": [{"type": "image_url", "image_url": {"url": image_data_uri(p)}}]}
+                for p in image_paths]
+        return self._scores(query, docs, len(image_paths))
 
 
 def build_reranker(settings: Settings) -> Reranker:
     if settings.build_mode == "local":
         return LexicalReranker()
-    return OpenAIReranker(settings.rerank_base_url, settings.rerank_model,
-                          settings.llm_api_key)
+    return ClassReranker(settings.rerank_base_url, settings.rerank_model,
+                         settings.api_key)

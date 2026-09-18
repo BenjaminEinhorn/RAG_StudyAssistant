@@ -52,3 +52,21 @@ def test_visual_search_returns_slide_images(app_state, small_doc):
 def test_remove_nonexistent_returns_message(app_state):
     r = app_state.catalog.remove_document("nope.pdf")
     assert r["ok"] is False
+
+
+def test_index_refuses_vectors_from_a_different_embedder(app_state, small_doc):
+    from course_assistant.core.index import Catalog
+    from course_assistant.services.embeddings import LocalHashEmbeddings
+
+    app_state.catalog.add_file(str(small_doc))
+    other = LocalHashEmbeddings(dim=app_state.settings.embed_dim)
+    other.name = "some-other-model"
+    with pytest.raises(RuntimeError, match="built with embedder"):
+        Catalog(app_state.settings, other, app_state.catalog.visual_embedder, None)
+
+
+def test_rerank_off_keeps_fused_order(app_state, small_doc):
+    app_state.catalog.add_file(str(small_doc))
+    app_state.catalog.reranker = None
+    hits = app_state.catalog.search("keyword search and vector search")
+    assert hits and hits == sorted(hits, key=lambda h: h.score, reverse=True)
