@@ -40,17 +40,45 @@ OUT = BASE / "results"
 DOC = {"w2": "Week 2", "w4": "Week 4", "w5": "Week 5"}
 
 QUESTIONS = [
-    # (question, type, expected_doc, expected_page)  page=None => unanswerable
-    ("What is retrieval augmented generation (RAG)?", "text", DOC["w5"], 10),
-    ("Why use RAG? Give the benefits over training data.", "text", DOC["w5"], 11),
-    ("What two components does hybrid RAG combine?", "text", DOC["w5"], 18),
-    ("What does the 'Vibe Coding on Prod' meme show?", "visual", DOC["w2"], 33),
-    ("Describe what the hybrid RAG pipeline diagram shows.", "visual", DOC["w5"], 18),
-    ("What port does Gradio serve an app on by default?", "text", DOC["w4"], 7),
-    ("What is semantic search typically based on?", "text", DOC["w5"], 15),
-    ("Name two common chunking strategies.", "text", DOC["w5"], 17),
-    ("Who won the 2024 Super Bowl and by how much?", "unanswerable", None, None),
-    ("How is RAG context optimization different from fine-tuning?", "text", DOC["w5"], 13),
+    # (question, type, [(doc, page), ...])  — one or more ground-truth slides;
+    # [] => unanswerable
+    ("What is retrieval augmented generation (RAG)?", "text", [(DOC["w5"], 10)]),
+    ("Why use RAG? Give the benefits over training data.", "text", [(DOC["w5"], 11)]),
+    ("What two components does hybrid RAG combine?", "text", [(DOC["w5"], 18)]),
+    ("What does the 'Vibe Coding on Prod' meme show?", "visual", [(DOC["w2"], 33)]),
+    ("Describe what the hybrid RAG pipeline diagram shows.", "visual", [(DOC["w5"], 18)]),
+    ("What port does Gradio serve an app on by default?", "text", [(DOC["w4"], 7)]),
+    ("What is semantic search typically based on?", "text", [(DOC["w5"], 15)]),
+    ("Name two common chunking strategies.", "text", [(DOC["w5"], 17)]),
+    ("Who won the 2024 Super Bowl and by how much?", "unanswerable", []),
+    ("How is RAG context optimization different from fine-tuning?", "text", [(DOC["w5"], 13)]),
+    # --- hard set (eval/hard-questions) ---
+    # 11. paraphrase: every question token is absent from the target slide
+    #     (Week 5 s16); verified with the bm25s tokenizer (empty intersection),
+    #     so keyword retrieval contributes nothing — vector-only.
+    ("What three processing steps does a newly supplied course file undergo "
+     "before it can be looked up, per the slide on readying papers?",
+     "text", [(DOC["w5"], 16)]),
+    # 12. the answer lives only in the slide image: Week 2 s34's two embedded
+    #     tweets (text layer holds just the title + column headers), verified
+    #     against the rendered slide.
+    ("What happened to the developer who built their app with AI, according to "
+     "the two posts on the 'Security? Never heard of it…' slide?",
+     "visual", [(DOC["w2"], 34)]),
+    # 13. near-duplicate slides: Week 4 s14 vs s15 describe the same Hermes
+    #     vision-model setup flow (Jaccard 0.45 over tokens) but only s14
+    #     contains the "Use for new chats" checkbox detail. Wording shares
+    #     content tokens with BOTH slides (verified with the bm25s tokenizer),
+    #     so keyword retrieval cannot shortcut to slide 14 alone.
+    ("When setting up a vision model in Hermes Desktop, which option should you "
+     "turn off so it does not become the default for everything?",
+     "text", [(DOC["w4"], 14)]),
+    # 14. needs two decks: Week 4 s11 (input/output price per million tokens,
+    #     or MTok) and Week 5 s20 (retrieving evidence early reduces the tokens
+    #     processed, saving money).
+    ("Why can a well-built RAG system cut your API costs, and in what unit do "
+     "the slides say OpenAI-style APIs quote their prices?",
+     "text", [(DOC["w4"], 11), (DOC["w5"], 20)]),
 ]
 
 ARMS = ("rerank_on", "rerank_off")
@@ -76,7 +104,10 @@ class _Timer:
         return inner
 
 
-def run_question(app, reranker, arm, qid, q, qtype, doc, page) -> dict:
+def run_question(app, reranker, arm, qid, q, qtype, expected) -> dict:
+    """One arm run for one question. ``expected`` is a list of (doc, page)
+    ground-truth pairs; every pair must appear in the evidence/citations for
+    the target_* flags to count as retrieved/cited."""
     app.catalog.reranker = reranker if arm == "rerank_on" else None
     timer = _Timer()
     search, visual = app.catalog.search, app.catalog.visual_search
@@ -93,7 +124,8 @@ def run_question(app, reranker, arm, qid, q, qtype, doc, page) -> dict:
         app.catalog.search, app.catalog.visual_search = search, visual
 
     row = {"arm": arm, "qid": qid, "question": q, "type": qtype,
-           "expected": f"{doc} slide {page}" if page else "(unanswerable)",
+           "expected": " + ".join(f"{d} slide {p}" for d, p in expected)
+           if expected else "(unanswerable)",
            "latency_s": round(latency, 3), "retrieval_s": round(timer.total, 3),
            "error": error}
     if res is None:
@@ -107,10 +139,10 @@ def run_question(app, reranker, arm, qid, q, qtype, doc, page) -> dict:
                   else f"[{c.number}] (not in evidence)" for c in cites],
         "excerpts": [c.excerpt for c in cites],
         "images_shown": len(res.used_images),
-        "target_retrieved": (any(_is_target(s, doc, page) for s in res.evidence)
-                             if page else None),
-        "target_cited": (any(_is_target(c.source, doc, page) for c in cites)
-                         if page else None),
+        "target_retrieved": (all(any(_is_target(s, doc, page) for s in res.evidence)
+                                 for doc, page in expected) if expected else None),
+        "target_cited": (all(any(_is_target(c.source, doc, page) for c in cites)
+                             for doc, page in expected) if expected else None),
         "all_cited_in_evidence": all(c.in_evidence for c in cites) if cites else None,
         "all_excerpts_found": (all(c.excerpt_found for c in cites if c.excerpt.strip())
                                if any(c.excerpt.strip() for c in cites) else None),
@@ -151,8 +183,19 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--offline", action="store_true",
                     help="allow COURSE_BUILD_MODE=local (plumbing check, NOT a result)")
+    ap.add_argument("--qids", default="",
+                    help="comma-separated 1-based question ids to run (default: all)")
     ap.add_argument("--out", default=str(OUT), help="output directory")
     args = ap.parse_args()
+
+    qids = {int(x) for x in args.qids.split(",") if x.strip()}
+    if qids:
+        questions = [(i, q) for i, q in enumerate(QUESTIONS, 1) if i in qids]
+        missing = sorted(qids - {i for i, _ in questions})
+        if missing:
+            sys.exit(f"Unknown question ids: {missing}")
+    else:
+        questions = list(enumerate(QUESTIONS, 1))
 
     # isolated index for the run; the mode is whatever the environment says
     os.environ["COURSE_DATA_DIR"] = tempfile.mkdtemp(prefix="eval_")
@@ -182,11 +225,11 @@ def main() -> None:
     app.assistant.answer("warm-up: what is RAG?")
 
     rows = []
-    for qid, (q, qtype, doc, page) in enumerate(QUESTIONS, 1):
+    for qid, (q, qtype, expected) in questions:
         # alternate arm order per question so neither arm always runs first
         order = ARMS if qid % 2 else tuple(reversed(ARMS))
         for arm in order:
-            row = run_question(app, reranker, arm, qid, q, qtype, doc, page)
+            row = run_question(app, reranker, arm, qid, q, qtype, expected)
             rows.append(row)
             print(f"[{arm:10s}] Q{qid:<2d} {row['latency_s']:6.2f}s "
                   f"retrieved={row.get('target_retrieved')} cited={row.get('target_cited')} "
