@@ -210,7 +210,40 @@ target sat at rank 2 and the paraphrase question's target (Q11) at rank 7 of 8.
 The replicate run was 12/13 with rerank on (Q1 at rank 2) and 11/13 with rerank
 off (Q1 and Q11).
 
-TODO(Vicente): interpretation
+**Interpretation.** Reranking did not change answer quality on this question set.
+Both arms retrieved and cited the target slide on all 13 answerable questions in
+both runs, refused the unanswerable one, and every answer was graded correct with
+supporting sources (28/28). Where reranking did make a difference is ordering: with
+rerank on, the target was the top evidence item in 13/13 and 12/13 answerable
+questions; with rerank off, in 11/13 in both runs. The clearest case is Q11, the
+paraphrase with no keyword overlap. Without reranking, its target slide sat 7th of
+8 evidence items in both runs; the reranker moved it to the top. That better
+ordering never reached the final answer because the model receives all eight
+evidence items, so a correct slide in 7th place is still read. The cost is latency:
+reranking roughly doubles end-to-end time (median 4.75 s / 4.54 s vs 2.77 s /
+2.40 s), almost all of it in retrieval (≈2.8 s vs ≈0.8 s).
+
+**Decision: we keep rerank on.** With the two arms tied on quality, the choice
+rests on risk rather than on the scores. The one genuinely hard retrieval case — a
+student asking about a slide in their own vocabulary, which is how students
+actually ask — is exactly where the unreranked order degraded, and it only
+survived because the evidence window is wide. That margin shrinks as the course
+grows: more decks mean more competing chunks, and a tighter context budget (fewer
+items sent to control token cost) would push a 7th-ranked slide out entirely. For
+a study assistant, two extra seconds per question is an acceptable price for that
+protection. We would switch reranking off if latency became the binding constraint,
+for example live use during class, or if the corpus stayed this small, since here
+it adds time without changing any answer.
+
+**Limitations.** The evidence is thin: 14 questions, two runs and a single human
+grader, and the first 10 questions were easy enough that both arms hit the ceiling.
+That is why the hard set was added, and even there only one question clearly
+separated the arms, so the ranking advantage is a consistent signal rather than a
+measured quality gain. The automated excerpt check also produced two false
+negatives: quotes taken from text inside a slide image (Week 5 slide 11), which
+PyMuPDF cannot extract, and a quote shortened with an ellipsis (Q11). Its flags
+therefore need human review; OCR at ingest, using the class :9005 service, would
+close the first gap.
 
 Earlier versions of this README reported 9/10 for three configs at 1–4 ms.
 Those numbers came from offline hash embeddings with the answer stage never
