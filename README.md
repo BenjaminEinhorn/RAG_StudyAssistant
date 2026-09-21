@@ -153,12 +153,17 @@ decks, 92 slides, ingested once). Arm order alternates per question and an
 untimed warm-up call runs first. Per question it records mechanically whether
 the ground-truth slide was in the evidence and was cited, whether every cited
 source is a retrieved item, whether every quoted excerpt occurs in its cited
-chunk, and end-to-end wall-clock latency. **Answer correctness and whether the
-sources support the answer are left for a human** — empty `correct` and
-`sources_support` columns in
+chunk, and end-to-end wall-clock latency. Ground truth is a list of one or more
+`(deck, slide)` pairs; for the two-deck question the `target_*` flags require
+**all** expected slides to be in the evidence/citations. **Answer correctness
+and whether the sources support the answer are left for a human** — empty
+`correct` and `sources_support` columns in
 [`results/comparison.csv`](results/comparison.csv); an LLM grading its own
 retrieval is not evidence. The script refuses to run offline unless passed
-`--offline`, and then writes to a file named `..._OFFLINE_not_a_result`.
+`--offline`, and then writes to a file named `..._OFFLINE_not_a_result`
+(`--qids 11,12,13,14` runs a subset; the four hard questions were appended in a
+separate live run of only those questions on 2026-09-20, so rows 1–10 — grade
+columns included — are byte-identical to the 2026-09-18 run).
 
 | # | Question | Type | Expected |
 |---|---|---|---|
@@ -172,45 +177,40 @@ retrieval is not evidence. The script refuses to run offline unless passed
 | 8 | Name two common chunking strategies. | text | W5 · slide 17 |
 | 9 | Who won the 2024 Super Bowl and by how much? | **unanswerable** | — |
 | 10 | How is RAG context optimization different from fine-tuning? | text | W5 · slide 13 |
+| 11 | What three processing steps does a newly supplied course file undergo before it can be looked up, per the slide on readying papers? | text | W5 · slide 16 |
+| 12 | What happened to the developer who built their app with AI, according to the two posts on the 'Security? Never heard of it…' slide? | **visual** | W2 · slide 34 |
+| 13 | When setting up a vision model in Hermes Desktop, which option should you turn off so it does not become the default for everything? | text | W4 · slide 14 |
+| 14 | Why can a well-built RAG system cut your API costs, and in what unit do the slides say OpenAI-style APIs quote their prices? | text | W4 · slide 11 + W5 · slide 20 |
 
-**Results** — two full runs on 2026-09-18 (main: `results/comparison.*`,
-replicate: `results/replicate/comparison.*`). Latency is end-to-end per question
-(n = 10 per arm per run); retrieval is the part spent in text + visual search.
+Questions 11–14 are the **hard set** added on `eval/hard-questions`: a
+paraphrase with **no keyword overlap** with its target slide (verified with the
+bm25s tokenizer — vector-only retrieval), a detail that exists **only in a
+slide image**, a **near-duplicate** slide pair where only one slide is correct
+(W4 s14 vs s15), and a question that needs **two decks** (W4 s11 + W5 s20).
+
+**Results** — runs on 2026-09-18 (main: `results/comparison.*`, replicate:
+`results/replicate/comparison.*`) with the four hard questions appended from a
+second live run on 2026-09-20. Latency is end-to-end per question (n = 14 per
+arm per run); retrieval is the part spent in text + visual search.
 
 | Metric | rerank on (main / replicate) | rerank off (main / replicate) |
 |---|---|---|
-| Target slide in evidence (9 answerable) | 9/9 · 9/9 | 9/9 · 9/9 |
-| Target slide cited | 9/9 · 9/9 | 9/9 · 9/9 |
-| Every cited source was retrieved | 9/9 · 9/9 | 9/9 · 9/9 |
-| Every quoted excerpt found in its chunk | 9/9 · 9/9 | 8/9 · 9/9 |
+| Target slide in evidence (13 answerable) | 13/13 · 13/13 | 13/13 · 13/13 |
+| Target slide cited | 13/13 · 13/13 | 13/13 · 13/13 |
+| Every cited source was retrieved | 13/13 · 13/13 | 13/13 · 13/13 |
+| Every quoted excerpt found in its chunk | 12/13 · 12/13 | 12/13 · 13/13 |
 | Unanswerable question refused, no citation | 1/1 · 1/1 | 1/1 · 1/1 |
-| Median latency | 4.67 s · 4.40 s | 2.76 s · 2.45 s |
-| Mean latency | 4.60 s · 4.50 s | 2.75 s · 2.42 s |
-| Median retrieval time | 2.69 s · 2.88 s | 0.79 s · 0.79 s |
+| Median latency | 4.75 s · 4.54 s | 2.77 s · 2.40 s |
+| Mean latency | 4.71 s · 4.65 s | 2.73 s · 2.40 s |
+| Median retrieval time | 2.80 s · 2.88 s | 0.78 s · 0.79 s |
 
-In the main run the target slide was the **top-ranked** evidence item in every
-answerable question with rerank on; with rerank off it was top-ranked in 8/9
-and second in one (Q1).
+In the main run the target was the **top-ranked** evidence item in every
+answerable question with rerank on (13/13), and 11/13 with rerank off: Q1's
+target sat at rank 2 and the paraphrase question's target (Q11) at rank 7 of 8.
+The replicate run was 12/13 with rerank on (Q1 at rank 2) and 11/13 with rerank
+off (Q1 and Q11).
 
-**Interpretation — a null result on quality, a clear cost in latency.** On this
-question set, hybrid retrieval with reciprocal-rank fusion already puts the
-ground-truth slide into the evidence for every answerable question, and the LLM
-cites it every time, so the reranker has nothing measurable left to fix. Its only
-visible effect is ordering (one target moved from rank 2 to rank 1). It costs
-about **+1.9–2.0 s per question** (≈70% more end-to-end time), almost all of it
-in the retrieval stage, because it scores ~20–40 text candidates plus up to six
-slide images per query. The single excerpt miss (rerank off, Q2, main run) is
-not a retrieval difference: the model correctly quoted text from the "Benefits
-of RAG" graphic on slide 11, which exists only as pixels, so the text-only
-checker could not find it; the replicate shows 9/9 for both arms.
-
-What this does **not** show: ten questions, mostly with one obvious target slide,
-cannot distinguish two arms that both score at the ceiling. The reranker may
-still help on harder, ambiguous questions or a larger corpus; that needs a
-larger question set to test. We keep **rerank on** as the default for the
-multimodal ordering of slide images, but on this evidence a latency-sensitive
-deployment could turn it off at no measured loss. Human grading of the
-`correct` / `sources_support` columns is still to be filled in by the team.
+TODO(Vicente): interpretation
 
 Earlier versions of this README reported 9/10 for three configs at 1–4 ms.
 Those numbers came from offline hash embeddings with the answer stage never
@@ -242,7 +242,7 @@ vectors that differ between slides.
   close this gap; not done yet.
 - Excerpt verification proves a quote exists in the cited chunk, not that the
   quote supports the claim. That judgement is the human `sources_support` column.
-- The evaluation is small (10 questions, 2 runs); see the interpretation above.
+- The evaluation is small (14 questions, 2 runs); see the interpretation above.
 - No auth; one shared quiz state per server process. Course use only.
 
 ## Files

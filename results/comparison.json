@@ -7,7 +7,7 @@
       "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx",
       "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx"
     ],
-    "ingest_s": 14.9,
+    "ingest_s": 15.7,
     "models": {
       "llm": {
         "base_url": "http://dobolyi.com:9001/v1",
@@ -29,32 +29,33 @@
     "k_text": 5,
     "k_visual": 3,
     "candidate_pool_per_retriever": 20,
-    "run_at": "2026-09-18 13:28:02 MDT"
+    "run_at": "2026-09-20 21:12:20 MDT",
+    "note": "Q1-Q10 rows collected 2026-09-18 13:28:02 MDT (PR #1, grades in CSV); Q11-Q14 hard set appended 2026-09-20 21:12:20 MDT from a separate live run of only those questions on branch eval/hard-questions."
   },
   "summary": {
     "rerank_on": {
       "errors": 0,
-      "target_retrieved": "9/9",
-      "target_cited": "9/9",
-      "all_cited_in_evidence": "9/9",
-      "all_excerpts_found": "9/9",
+      "target_retrieved": "13/13",
+      "target_cited": "13/13",
+      "all_cited_in_evidence": "13/13",
+      "all_excerpts_found": "12/13",
       "unanswerable_abstained": "1/1",
-      "latency_median_s": 4.667,
-      "latency_mean_s": 4.595,
+      "latency_median_s": 4.755,
+      "latency_mean_s": 4.705,
       "latency_max_s": 5.366,
-      "retrieval_median_s": 2.688
+      "retrieval_median_s": 2.799
     },
     "rerank_off": {
       "errors": 0,
-      "target_retrieved": "9/9",
-      "target_cited": "9/9",
-      "all_cited_in_evidence": "9/9",
-      "all_excerpts_found": "8/9",
+      "target_retrieved": "13/13",
+      "target_cited": "13/13",
+      "all_cited_in_evidence": "13/13",
+      "all_excerpts_found": "12/13",
       "unanswerable_abstained": "1/1",
-      "latency_median_s": 2.756,
-      "latency_mean_s": 2.752,
+      "latency_median_s": 2.768,
+      "latency_mean_s": 2.729,
       "latency_max_s": 3.999,
-      "retrieval_median_s": 0.794
+      "retrieval_median_s": 0.782
     }
   },
   "rows": [
@@ -726,6 +727,282 @@
       "excerpts": [
         "RAG optimizes context by supplying relevant information when the model responds",
         "Fine-tuning adapts the model itself through additional training"
+      ],
+      "images_shown": 4,
+      "target_retrieved": true,
+      "target_cited": true,
+      "all_cited_in_evidence": true,
+      "all_excerpts_found": true,
+      "abstained": false
+    },
+    {
+      "arm": "rerank_off",
+      "qid": 11,
+      "question": "What three processing steps does a newly supplied course file undergo before it can be looked up, per the slide on readying papers?",
+      "type": "text",
+      "expected": "Week 5 slide 16",
+      "latency_s": 2.831,
+      "retrieval_s": 0.758,
+      "error": null,
+      "answer": "According to the slide titled \"Preparing Documents (Docs) for Search\" in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation (page 16), the three processing steps a document undergoes are:\n\n1.  **Parsing**: This step \"extracts text and structure from each doc\".\n2.  **Chunking**: This step \"divides the parsed content of each doc into useful passages while preserving source metadata (e.g., doc name, page number)\".\n3.  **Indexing**: This step \"prepares the chunked passages for both: Keyword (lexical) search... and Vector search\".",
+      "found": true,
+      "evidence": [
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p27",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p23",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p12",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p8",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p26",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p9",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p24"
+      ],
+      "cited": [
+        "[7] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16",
+        "[7] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16",
+        "[7] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16"
+      ],
+      "excerpts": [
+        "Parsing extracts text and structure from each doc",
+        "Chunking divides the parsed content of each doc into useful passages while preserving source metadata",
+        "Indexing prepares the chunked passages for both"
+      ],
+      "images_shown": 4,
+      "target_retrieved": true,
+      "target_cited": true,
+      "all_cited_in_evidence": true,
+      "all_excerpts_found": true,
+      "abstained": false
+    },
+    {
+      "arm": "rerank_on",
+      "qid": 11,
+      "question": "What three processing steps does a newly supplied course file undergo before it can be looked up, per the slide on readying papers?",
+      "type": "text",
+      "expected": "Week 5 slide 16",
+      "latency_s": 4.964,
+      "retrieval_s": 2.762,
+      "error": null,
+      "answer": "According to the slide \"Preparing Documents (Docs) for Search\" in the MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx presentation (page 16), a newly supplied course file undergoes three processing steps before it can be looked up:\n\n1.  **Parsing**: This step extracts text and structure from each document.\n2.  **Chunking**: This step divides the parsed content of each document into useful passages while preserving source metadata (e.g., doc name, page number).\n3.  **Indexing**: This step prepares the chunked passages for both keyword (lexical) search and vector search.",
+      "found": true,
+      "evidence": [
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p21",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p14",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p6",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p4",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p24",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p8"
+      ],
+      "cited": [
+        "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16",
+        "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16",
+        "[1] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p16"
+      ],
+      "excerpts": [
+        "Parsing extracts text and structure from each doc",
+        "Chunking divides the parsed content of each doc into useful passages while preserving source metadata",
+        "Indexing prepares the chunked passages for both: Keyword (lexical) search... Vector search"
+      ],
+      "images_shown": 4,
+      "target_retrieved": true,
+      "target_cited": true,
+      "all_cited_in_evidence": true,
+      "all_excerpts_found": false,
+      "abstained": false
+    },
+    {
+      "arm": "rerank_off",
+      "qid": 12,
+      "question": "What happened to the developer who built their app with AI, according to the two posts on the 'Security? Never heard of it\u2026' slide?",
+      "type": "visual",
+      "expected": "Week 2 slide 34",
+      "latency_s": 2.855,
+      "retrieval_s": 0.776,
+      "error": null,
+      "answer": "According to the slide titled \"Security? Never heard of it...\" in the MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx presentation (slide 34), the developer (user @leo jr94) stated that he is \"under attack\" because he shared how he built his SaaS using Cursor. He described that \"random thing are happening, maxed out usage on api keys, people bypassing the subscription, creating random shit on db.\"",
+      "found": true,
+      "evidence": [
+        "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p34",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p4",
+        "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p41",
+        "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p40",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p19",
+        "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p20",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p18"
+      ],
+      "cited": [
+        "[1] MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p34"
+      ],
+      "excerpts": [
+        "Security? Never heard of it\u2026 How it started\u2026 How it\u2019s going\u2026"
+      ],
+      "images_shown": 4,
+      "target_retrieved": true,
+      "target_cited": true,
+      "all_cited_in_evidence": true,
+      "all_excerpts_found": true,
+      "abstained": false
+    },
+    {
+      "arm": "rerank_on",
+      "qid": 12,
+      "question": "What happened to the developer who built their app with AI, according to the two posts on the 'Security? Never heard of it\u2026' slide?",
+      "type": "visual",
+      "expected": "Week 2 slide 34",
+      "latency_s": 4.746,
+      "retrieval_s": 3.025,
+      "error": null,
+      "answer": "According to the slide titled \"Security? Never heard of it...\" in the MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx presentation (slide 34), the developer named Leo stated that he was \"under attack\" after sharing that he built his SaaS using Cursor. He reported that \"random thing are happening, maxed out usage on api keys, people bypassing the subscription, creating random shit on db\".",
+      "found": true,
+      "evidence": [
+        "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p34",
+        "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p28",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p4",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p12",
+        "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p3",
+        "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p20",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p18"
+      ],
+      "cited": [
+        "[1] MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p34"
+      ],
+      "excerpts": [
+        "Security? Never heard of it\u2026 How it started\u2026 How it\u2019s going\u2026"
+      ],
+      "images_shown": 4,
+      "target_retrieved": true,
+      "target_cited": true,
+      "all_cited_in_evidence": true,
+      "all_excerpts_found": true,
+      "abstained": false
+    },
+    {
+      "arm": "rerank_off",
+      "qid": 13,
+      "question": "When setting up a vision model in Hermes Desktop, which option should you turn off so it does not become the default for everything?",
+      "type": "text",
+      "expected": "Week 4 slide 14",
+      "latency_s": 2.233,
+      "retrieval_s": 0.782,
+      "error": null,
+      "answer": "When setting up a vision model in Hermes Desktop, you should uncheck the \"Use for new chats\" option. This is mentioned in the \"Adding a Vision Model to Hermes Agent\" slide (MBAX 6418 - Week 4 - Serving and Debugging v4.pptx, page 14), which instructs users to \"be sure to uncheck 'Use for new chats'\" when filling out the Custom Endpoints screen.",
+      "found": true,
+      "evidence": [
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p14",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p15",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p16",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p25",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p27",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p9"
+      ],
+      "cited": [
+        "[1] MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p14"
+      ],
+      "excerpts": [
+        "be sure to uncheck \u201cUse for new chats\u201d"
+      ],
+      "images_shown": 4,
+      "target_retrieved": true,
+      "target_cited": true,
+      "all_cited_in_evidence": true,
+      "all_excerpts_found": true,
+      "abstained": false
+    },
+    {
+      "arm": "rerank_on",
+      "qid": 13,
+      "question": "When setting up a vision model in Hermes Desktop, which option should you turn off so it does not become the default for everything?",
+      "type": "text",
+      "expected": "Week 4 slide 14",
+      "latency_s": 5.204,
+      "retrieval_s": 2.943,
+      "error": null,
+      "answer": "When setting up a vision model in Hermes Desktop, you should uncheck the \"Use for new chats\" option. This prevents the newly added vision model from automatically becoming the default for all new conversations. According to the \"Adding a Vision Model to Hermes Agent\" slide in the MBAX 6418 - Week 4 - Serving and Debugging v4.pptx presentation (slide/page 14), you must \"be sure to uncheck 'Use for new chats'\" before clicking Test and Save.",
+      "found": true,
+      "evidence": [
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p14",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p15",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p16",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p25",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p8",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p24"
+      ],
+      "cited": [
+        "[1] MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p14"
+      ],
+      "excerpts": [
+        "be sure to uncheck \u201cUse for new chats\u201d"
+      ],
+      "images_shown": 4,
+      "target_retrieved": true,
+      "target_cited": true,
+      "all_cited_in_evidence": true,
+      "all_excerpts_found": true,
+      "abstained": false
+    },
+    {
+      "arm": "rerank_off",
+      "qid": 14,
+      "question": "Why can a well-built RAG system cut your API costs, and in what unit do the slides say OpenAI-style APIs quote their prices?",
+      "type": "text",
+      "expected": "Week 4 slide 11 + Week 5 slide 20",
+      "latency_s": 2.768,
+      "retrieval_s": 0.768,
+      "error": null,
+      "answer": "A well-built RAG system can cut API costs because \"retrieving relevant evidence early can reduce tokens spent processing irrelevant information, repeating searches, and performing unnecessary reasoning\" (MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx, slide 20). By supplying only the most relevant information to the model, you use fewer tokens overall. OpenAI-style APIs quote their prices per \"million tokens, or MTok\" (MBAX 6418 - Week 4 - Serving and Debugging v4.pptx, slide 11).",
+      "found": true,
+      "evidence": [
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p11",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p10",
+        "MBAX 6418 - Week 2 - LLM Fundamentals v2.pptx p4",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p14",
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p12",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p20",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p13"
+      ],
+      "cited": [
+        "[7] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p20",
+        "[1] MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p11"
+      ],
+      "excerpts": [
+        "Retrieving relevant evidence early can reduce tokens spent processing irrelevant information, repeating searches, and performing unnecessary reasoning",
+        "input/output price per million tokens, or MTok"
+      ],
+      "images_shown": 4,
+      "target_retrieved": true,
+      "target_cited": true,
+      "all_cited_in_evidence": true,
+      "all_excerpts_found": true,
+      "abstained": false
+    },
+    {
+      "arm": "rerank_on",
+      "qid": 14,
+      "question": "Why can a well-built RAG system cut your API costs, and in what unit do the slides say OpenAI-style APIs quote their prices?",
+      "type": "text",
+      "expected": "Week 4 slide 11 + Week 5 slide 20",
+      "latency_s": 5.008,
+      "retrieval_s": 2.799,
+      "error": null,
+      "answer": "According to the \"RAG Done Right Can Be Valuable\" slide (MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx, slide/page 20), a well-built RAG system can cut costs because \"Retrieving relevant evidence early can reduce tokens spent processing irrelevant information, repeating searches, and performing unnecessary reasoning.\" Regarding pricing, the \"OpenAI API\" slide (MBAX 6418 - Week 4 - Serving and Debugging v4.pptx, slide/page 11) states that you pay per request, specifically citing the \"input/output price per million tokens, or MTok.\"",
+      "found": true,
+      "evidence": [
+        "MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p11",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p14",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p20",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p9",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p11",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p13",
+        "MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p18"
+      ],
+      "cited": [
+        "[3] MBAX 6418 - Week 5 - Context Engineering and RAG v1.pptx p20",
+        "[1] MBAX 6418 - Week 4 - Serving and Debugging v4.pptx p11"
+      ],
+      "excerpts": [
+        "Retrieving relevant evidence early can reduce tokens spent processing irrelevant information, repeating searches, and performing unnecessary reasoning",
+        "input/output price per million tokens, or MTok"
       ],
       "images_shown": 4,
       "target_retrieved": true,
