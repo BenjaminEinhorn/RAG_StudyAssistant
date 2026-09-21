@@ -17,7 +17,7 @@ from pathlib import Path
 
 import gradio as gr
 
-from ..config.settings import Settings
+from ..config.settings import Settings, redact
 from ..core.assistant import Assistant
 from ..core.index import Catalog
 from ..core.quiz import Quiz, generate_quiz, score
@@ -30,6 +30,7 @@ BRAND_CSS = """
   :root { --brand: #b45309; --brand2: #d97706; }
   .course-hero { background: linear-gradient(120deg,#7c2d12,#b45309 55%,#d97706);
      color:#fff; padding:22px 26px; border-radius:18px; margin-bottom:18px; }
+  .course-hero h1, .course-hero p { color:#fff !important; }
   .course-hero h1 { margin:0; font-size:26px; letter-spacing:.4px; }
   .course-hero p { margin:6px 0 0; opacity:.94; font-size:14px; }
   .gr-accordion { border-radius:14px !important; }
@@ -71,31 +72,67 @@ def list_docs_df(app: AppState) -> list:
 
 def ask_handler(app: AppState, question: str, doc_selection: list, ask_images: bool):
     if not question.strip():
-        return "Please type a question.", gr.update()  # type: ignore
-    result = app.assistant.answer(
-        question.strip(), doc_names=doc_selection or None, include_images=ask_images)
-    # answer card
+        return "Please type a question.", []
+    try:
+        result = app.assistant.answer(
+            question.strip(), doc_names=doc_selection or None, include_images=ask_images)
+    except Exception as e:  # service errors: show them, never the key
+        return f"⚠️ Could not answer: {redact(str(e))}", []
     answer_md = f"**Answer**  \n{result.answer}\n\n"
     src_md = "**Sources**  \n"
-    if not result.sources:
-        src_md += "*(no supporting material found)*"
+    if not result.found_evidence:
+        src_md += "*(no supporting material found — nothing is cited)*"
     else:
-        src_lines = [
-            f"- **{s.doc_name}** — slide/page **{s.page}**  \n  “{s.text[:180]}…”"
-            for s in result.sources[:5]
-        ]
-        src_md += "\n".join(src_lines)
-    gallery = [
-        (img, _caption_of(result.sources, img)) for img in result.used_images
-    ] if result.used_images else []
+        lines = []
+        for c in result.citations:
+            if c.source is None:
+                lines.append(f"- ⚠️ cited evidence [{c.number}] does not exist — ignored")
+                continue
+            if c.excerpt_found:
+                check = f"✅ quote verified: “{c.excerpt}”"
+            elif c.supported:
+                check = "✅ supported by the slide image shown to the model"
+            else:
+                check = f"⚠️ quote not found in this slide: “{c.excerpt}”"
+            lines.append(f"- **{c.source.doc_name}** — slide/page **{c.source.page}**  \n  {check}")
+        if not result.citations:
+            lines.append("⚠️ The answer cites no source; treat it as unverified.")
+        src_md += "\n".join(lines)
+    gallery = []
+    if result.found_evidence:
+        # cited slides first, then the other slides the model was shown
+        cited = [s.image_path for s in result.sources if s.image_path]
+        for img in cited + result.used_images:
+            if img not in [g for g, _ in gallery]:
+                gallery.append((img, _caption_of(result.evidence, img)))
     return answer_md + src_md, gallery
 
 
 def _caption_of(sources, img_path: str) -> str:
     for s in sources:
         if s.image_path == img_path and s.image_path:
-            return f"{s.doc_name} — slide {s.page}"
+            return f"Slide {s.page} · {s.doc_name}"
     return Path(img_path).parent.name + " slide " + Path(img_path).stem[1:]
+
+
+def quiz_feedback(quiz: Quiz, answers: dict[int, int], reveal_all: bool = False) -> str:
+    """Markdown feedback: score plus, per question, the key, explanation and source."""
+    res = score(quiz, answers)
+    lines = [f"**Score: {res['score']} / {res['total']}**" if not reveal_all
+             else "**Answer key**"]
+    for r, q in zip(res["results"], quiz.questions):
+        right = q.choices[r["answer_index"]]
+        if reveal_all:
+            mark = "🔑"
+        elif r["chosen"] is None:
+            mark = "⏭️ not answered"
+        else:
+            mark = "✅" if r["correct"] else f"❌ you chose “{q.choices[r['chosen']]}”"
+        lines.append(f"{mark} **Q{r['id']+1}** — correct answer: **{right}**  \n"
+                     f"{r['explanation']}  \n"
+                     f"<span class=hint>Source: {r['source_doc']} — slide/page "
+                     f"{r['source_page']} · “{(r['source_excerpt'] or '')[:200]}”</span>")
+    return "\n\n".join(lines)
 
 
 def q_inputs():
@@ -122,7 +159,7 @@ def build_ui(app: AppState) -> gr.Blocks:
             ask_imgs = gr.Checkbox(label="Show slide images as visual evidence", value=True)
             ask_btn = gr.Button("Ask", variant="primary")
             ask_answer = gr.Markdown()
-            ask_gallery = gr.Gallery(label="Supporting slide images", height=280,
+            ask_gallery = gr.Gallery(label="Supporting slide images", height=420,
                                      columns=3, object_fit="contain")
             ask_btn.click(
                 lambda q, d, i: ask_handler(app, q, d, i),
@@ -139,7 +176,6 @@ def build_ui(app: AppState) -> gr.Blocks:
                                   label="Number of questions")
             q_gen = gr.Button("Generate quiz", variant="primary")
             q_status = gr.Markdown("")
-            quiz_state = gr.State(value=None)
 
             # answers: a fixed grid of question radios
             qrows = []
@@ -155,49 +191,42 @@ def build_ui(app: AppState) -> gr.Blocks:
                                          num_questions=int(num))
                     app.quiz = quiz
                 except Exception as e:  # surface clear, non-crashing error
-                    return (f"⚠️ Could not generate quiz: {e}", gr.update(),
+                    return (f"⚠️ Could not generate quiz: {redact(str(e))}", "",
                             *[gr.update() for _ in range(MAX_QUESTIONS)])
                 updates = []
                 for i, q in enumerate(quiz.questions):
-                    updates.append(
-                        gr.update(label=f"Q{i+1}: {q.question}", visible=True,
-                                  choices=q.choices))
-                for j in range(len(quiz.questions), MAX_QUESTIONS):
-                    updates.append(gr.update(visible=False))
-                preview = "\n\n".join(
-                    f"**{i+1}. {q.question}**\n" + "\n".join(f"{c}" for c in q.choices)
-                    for i, q in enumerate(quiz.questions))
+                    # value = choice index, so grading never parses choice text
+                    updates.append(gr.update(
+                        label=f"Q{i+1}: {q.question}", visible=True, value=None,
+                        choices=[(c, j) for j, c in enumerate(q.choices)]))
+                for _ in range(len(quiz.questions), MAX_QUESTIONS):
+                    updates.append(gr.update(visible=False, value=None))
                 return (f"✅ Generated {quiz.total()} questions — answer below, "
-                        "then **Grade** (or **Show answers**).", preview, updates)
+                        "then **Grade** (or **Show answers**).", "", *updates)
 
-            def grade(app, *answers):
+            def grade(app, *radio_answers):
                 if app.quiz is None:
                     return "Generate a quiz first."
-                # answers[0] is the quiz_state value; 1..N are the radios.
-                radio_answers = answers[1:]
                 submitted = {i: int(v) for i, v in enumerate(radio_answers)
-                             if v is not None}
-                res = score(app.quiz, submitted)
-                lines = [f"**Score: {res['score']} / {res['total']}**"]
-                for r in res["results"]:
-                    right = r["answer_index"]
-                    mark = "✅" if r["correct"] else f"❌ (correct: choice {right+1})"
-                    lines.append(f"{mark} **Q{r['id']+1}** · {r['explanation']}")
-                    if r.get("source_doc"):
-                        lines.append(f"<span class=hint>Source: {r['source_doc']}"
-                                     f" — slide/page {r['source_page']}</span>")
-                lines.append("\nSources for each answer are excerpted from the "
-                             "loaded material (see above).")
-                return "\n\n".join(lines)
+                             if v is not None and i < app.quiz.total()}
+                if not submitted:
+                    return "Answer at least one question first (or **Show answers**)."
+                return quiz_feedback(app.quiz, submitted)
 
+            def reveal(app):
+                if app.quiz is None:
+                    return "Generate a quiz first."
+                return quiz_feedback(app.quiz, {}, reveal_all=True)
+
+            q_result = gr.Markdown("")
             q_gen.click(lambda t, n, d: gen(app, t, n, d),
                         inputs=[q_topic, q_num, q_docs],
-                        outputs=[q_status, quiz_state, *qrows])
-            q_grade = gr.Button("Grade my answers", variant="secondary")
-            q_result = gr.Markdown("")
-            q_grade.click(lambda *a: grade(app, *a),
-                          inputs=[quiz_state, *qrows],
-                          outputs=q_result)
+                        outputs=[q_status, q_result, *qrows])
+            with gr.Row():
+                q_grade = gr.Button("Grade my answers", variant="secondary")
+                q_reveal = gr.Button("Show answers")
+            q_grade.click(lambda *a: grade(app, *a), inputs=qrows, outputs=q_result)
+            q_reveal.click(lambda: reveal(app), inputs=[], outputs=q_result)
 
         # ---------------- DOCUMENTS ----------------
         with gr.Tab("Documents"):

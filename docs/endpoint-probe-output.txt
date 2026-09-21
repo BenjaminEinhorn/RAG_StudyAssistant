@@ -1,0 +1,1064 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+
+==================== :9001
+
+--- :9001 GET /v1/models
+>>> GET http://dobolyi.com:9001/v1/models
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+<<< HTTP 200  (280 ms)  content-type=application/json
+<<< shape:
+  $: dict[2]
+    'object': str "list"
+    'data': list len=1
+      [0]: dict[8]
+        'id': str "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit"
+        'object': str "model"
+        'created': int 1789760081
+        'owned_by': str "vllm"
+        'root': str "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit"
+        'parent': NoneType None
+        'max_model_len': int 65536
+        'permission': list len=1
+          [0]: dict[12]
+            'id': str "modelperm-a68e9871a22784f0"
+            'object': str "model_permission"
+            'created': int 1789760081
+            'allow_create_engine': bool False
+            'allow_sampling': bool True
+            'allow_logprobs': bool True
+            'allow_search_indices': bool False
+            'allow_view': bool True
+            'allow_fine_tuning': bool False
+            'organization': str "*"
+            'group': NoneType None
+            'is_blocking': bool False
+
+--- :9001 chat text-only
+>>> POST http://dobolyi.com:9001/v1/chat/completions
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit",
+  "max_tokens": 60,
+  "temperature": 0,
+  "messages": [
+    {
+      "role": "user",
+      "content": "Reply with exactly: pong"
+    }
+  ]
+}
+<<< HTTP 200  (516 ms)  content-type=application/json
+<<< shape:
+  $: dict[14]
+    'id': str "chatcmpl-b53427a8a9ad4f75"
+    'object': str "chat.completion"
+    'created': int 1789760081
+    'model': str "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit"
+    'choices': list len=1
+      [0]: dict[7]
+        'index': int 0
+        'message': dict[7]
+          'role': str "assistant"
+          'content': NoneType None
+          'refusal': NoneType None
+          'annotations': NoneType None
+          'audio': NoneType None
+          'function_call': NoneType None
+          'reasoning': str "Here's a thinking process:\n\n1.  **Analyze User Input:** The user says \"Reply with exactly: pong\"\n2.  **Identify Constraint:** The constraint is explicit: \"Reply...<225 chars>"
+        'logprobs': NoneType None
+        'finish_reason': str "length"
+        'stop_reason': NoneType None
+        'token_ids': NoneType None
+        'routed_experts': NoneType None
+    'service_tier': NoneType None
+    'system_fingerprint': str "vllm-0.29.0-544d88b9"
+    'usage': dict[5]
+      'prompt_tokens': int 15
+      'total_tokens': int 75
+      'completion_tokens': int 60
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': dict[1]
+        'reasoning_tokens': int 60
+    'prompt_logprobs': NoneType None
+    'prompt_token_ids': NoneType None
+    'prompt_text': NoneType None
+    'kv_transfer_params': NoneType None
+    'ec_transfer_params': NoneType None
+    'metrics': NoneType None
+
+--- :9001 chat text-only, thinking disabled
+>>> POST http://dobolyi.com:9001/v1/chat/completions
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit",
+  "max_tokens": 60,
+  "temperature": 0,
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "Reply with exactly: pong"
+    }
+  ]
+}
+<<< HTTP 200  (303 ms)  content-type=application/json
+<<< shape:
+  $: dict[14]
+    'id': str "chatcmpl-a26e78825c458f6c"
+    'object': str "chat.completion"
+    'created': int 1789760082
+    'model': str "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit"
+    'choices': list len=1
+      [0]: dict[7]
+        'index': int 0
+        'message': dict[7]
+          'role': str "assistant"
+          'content': str "pong"
+          'refusal': NoneType None
+          'annotations': NoneType None
+          'audio': NoneType None
+          'function_call': NoneType None
+          'reasoning': NoneType None
+        'logprobs': NoneType None
+        'finish_reason': str "stop"
+        'stop_reason': NoneType None
+        'token_ids': NoneType None
+        'routed_experts': NoneType None
+    'service_tier': NoneType None
+    'system_fingerprint': str "vllm-0.29.0-544d88b9"
+    'usage': dict[5]
+      'prompt_tokens': int 17
+      'total_tokens': int 19
+      'completion_tokens': int 2
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': dict[1]
+        'reasoning_tokens': int 0
+    'prompt_logprobs': NoneType None
+    'prompt_token_ids': NoneType None
+    'prompt_text': NoneType None
+    'kv_transfer_params': NoneType None
+    'ec_transfer_params': NoneType None
+    'metrics': NoneType None
+
+--- :9001 chat with image part (thinking disabled)
+>>> POST http://dobolyi.com:9001/v1/chat/completions
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit",
+  "max_tokens": 80,
+  "temperature": 0,
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "What colour is this image and what text is on it?"
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAA...<2874 chars>"
+          }
+        }
+      ]
+    }
+  ]
+}
+<<< HTTP 200  (676 ms)  content-type=application/json
+<<< shape:
+  $: dict[14]
+    'id': str "chatcmpl-a3d3a5a27d1a5512"
+    'object': str "chat.completion"
+    'created': int 1789760082
+    'model': str "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit"
+    'choices': list len=1
+      [0]: dict[7]
+        'index': int 0
+        'message': dict[7]
+          'role': str "assistant"
+          'content': str "The image is primarily **red** \u2014 specifically, a solid red background.\n\nInside the red area, there is a **black rectangular border**, and within that border, on...<330 chars>"
+          'refusal': NoneType None
+          'annotations': NoneType None
+          'audio': NoneType None
+          'function_call': NoneType None
+          'reasoning': NoneType None
+        'logprobs': NoneType None
+        'finish_reason': str "length"
+        'stop_reason': NoneType None
+        'token_ids': NoneType None
+        'routed_experts': NoneType None
+    'service_tier': NoneType None
+    'system_fingerprint': str "vllm-0.29.0-544d88b9"
+    'usage': dict[5]
+      'prompt_tokens': int 103
+      'total_tokens': int 183
+      'completion_tokens': int 80
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': dict[1]
+        'reasoning_tokens': int 0
+    'prompt_logprobs': NoneType None
+    'prompt_token_ids': NoneType None
+    'prompt_text': NoneType None
+    'kv_transfer_params': NoneType None
+    'ec_transfer_params': NoneType None
+    'metrics': NoneType None
+
+--- :9001 chat response_format=json_schema
+>>> POST http://dobolyi.com:9001/v1/chat/completions
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit",
+  "max_tokens": 200,
+  "temperature": 0,
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "Give the capital of France."
+    }
+  ],
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "answer",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "answer",
+          "sources"
+        ],
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+<<< HTTP 200  (413 ms)  content-type=application/json
+<<< shape:
+  $: dict[14]
+    'id': str "chatcmpl-900fdd53f4d92cfd"
+    'object': str "chat.completion"
+    'created': int 1789760083
+    'model': str "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit"
+    'choices': list len=1
+      [0]: dict[7]
+        'index': int 0
+        'message': dict[7]
+          'role': str "assistant"
+          'content': str "{\n  \"answer\": \"Paris\"\n  , \"sources\": []\n}"
+          'refusal': NoneType None
+          'annotations': NoneType None
+          'audio': NoneType None
+          'function_call': NoneType None
+          'reasoning': NoneType None
+        'logprobs': NoneType None
+        'finish_reason': str "stop"
+        'stop_reason': NoneType None
+        'token_ids': NoneType None
+        'routed_experts': NoneType None
+    'service_tier': NoneType None
+    'system_fingerprint': str "vllm-0.29.0-544d88b9"
+    'usage': dict[5]
+      'prompt_tokens': int 18
+      'total_tokens': int 38
+      'completion_tokens': int 20
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': dict[1]
+        'reasoning_tokens': int 0
+    'prompt_logprobs': NoneType None
+    'prompt_token_ids': NoneType None
+    'prompt_text': NoneType None
+    'kv_transfer_params': NoneType None
+    'ec_transfer_params': NoneType None
+    'metrics': NoneType None
+    json_schema honoured: parsed keys=['answer', 'sources']
+
+--- :9001 chat response_format=json_object
+>>> POST http://dobolyi.com:9001/v1/chat/completions
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit",
+  "max_tokens": 200,
+  "temperature": 0,
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "Return a JSON object with key 'capital' for France."
+    }
+  ],
+  "response_format": {
+    "type": "json_object"
+  }
+}
+<<< HTTP 200  (327 ms)  content-type=application/json
+<<< shape:
+  $: dict[14]
+    'id': str "chatcmpl-b66d8a01fa7dd4e0"
+    'object': str "chat.completion"
+    'created': int 1789760083
+    'model': str "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit"
+    'choices': list len=1
+      [0]: dict[7]
+        'index': int 0
+        'message': dict[7]
+          'role': str "assistant"
+          'content': str "{\"capital\": \"Paris\"}"
+          'refusal': NoneType None
+          'annotations': NoneType None
+          'audio': NoneType None
+          'function_call': NoneType None
+          'reasoning': NoneType None
+        'logprobs': NoneType None
+        'finish_reason': str "stop"
+        'stop_reason': NoneType None
+        'token_ids': NoneType None
+        'routed_experts': NoneType None
+    'service_tier': NoneType None
+    'system_fingerprint': str "vllm-0.29.0-544d88b9"
+    'usage': dict[5]
+      'prompt_tokens': int 24
+      'total_tokens': int 31
+      'completion_tokens': int 7
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': dict[1]
+        'reasoning_tokens': int 0
+    'prompt_logprobs': NoneType None
+    'prompt_token_ids': NoneType None
+    'prompt_text': NoneType None
+    'kv_transfer_params': NoneType None
+    'ec_transfer_params': NoneType None
+    'metrics': NoneType None
+
+==================== :9002
+
+--- :9002 GET /v1/models
+>>> GET http://dobolyi.com:9002/v1/models
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+<<< HTTP 200  (246 ms)  content-type=application/json
+<<< shape:
+  $: dict[2]
+    'object': str "list"
+    'data': list len=1
+      [0]: dict[8]
+        'id': str "nvidia/Nemotron-3-Embed-1B-BF16"
+        'object': str "model"
+        'created': int 1789760083
+        'owned_by': str "vllm"
+        'root': str "nvidia/Nemotron-3-Embed-1B-BF16"
+        'parent': NoneType None
+        'max_model_len': int 8192
+        'permission': list len=1
+          [0]: dict[12]
+            'id': str "modelperm-9e3d81aa2dfa3487"
+            'object': str "model_permission"
+            'created': int 1789760083
+            'allow_create_engine': bool False
+            'allow_sampling': bool True
+            'allow_logprobs': bool True
+            'allow_search_indices': bool False
+            'allow_view': bool True
+            'allow_fine_tuning': bool False
+            'organization': str "*"
+            'group': NoneType None
+            'is_blocking': bool False
+
+--- :9002 POST /v2/embed (contract endpoint)
+>>> POST http://dobolyi.com:9002/v2/embed
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "nvidia/Nemotron-3-Embed-1B-BF16",
+  "texts": [
+    "Hybrid RAG combines keyword and vector search.",
+    "The quarterly revenue grew by ten percent."
+  ],
+  "input_type": "search_document",
+  "embedding_types": [
+    "float"
+  ]
+}
+<<< HTTP 400  (264 ms)  content-type=application/json
+<<< shape:
+  $: dict[1]
+    'error': dict[4]
+      'message': str "Unsupported input_type 'search_document'. Supported values: document, query"
+      'type': str "BadRequestError"
+      'param': NoneType None
+      'code': int 400
+
+--- :9002 POST /v2/embed input_type=document
+>>> POST http://dobolyi.com:9002/v2/embed
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "nvidia/Nemotron-3-Embed-1B-BF16",
+  "texts": [
+    "Hybrid RAG combines keyword and vector search.",
+    "The quarterly revenue grew by ten percent."
+  ],
+  "input_type": "document",
+  "embedding_types": [
+    "float"
+  ]
+}
+<<< HTTP 200  (431 ms)  content-type=application/json
+<<< shape:
+  $: dict[5]
+    'id': str "embd-a45ccd338d81fe04"
+    'embeddings': dict[1]
+      'float': list len=2
+        [0]: list[number] len=2048 head=[0.1404, 0.03001, -0.04578]
+        [1]: list[number] len=2048 head=[0.1452, 0.0262, -0.02644]
+    'texts': list len=2
+      [0]: str "Hybrid RAG combines keyword and vector search."
+      [1]: str "The quarterly revenue grew by ten percent."
+    'meta': dict[2]
+      'api_version': dict[1]
+        'version': str "2"
+      'billed_units': dict[2]
+        'input_tokens': int 24
+        'image_tokens': int 0
+    'response_type': str "embeddings_by_type"
+    vectors=2 dims=[2048] COURSE_EMBED_DIM=unset match=n/a
+    cosine(text0, text1)=0.2816
+
+--- :9002 POST /v2/embed input_type=query
+>>> POST http://dobolyi.com:9002/v2/embed
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "nvidia/Nemotron-3-Embed-1B-BF16",
+  "texts": [
+    "Hybrid RAG combines keyword and vector search."
+  ],
+  "input_type": "query",
+  "embedding_types": [
+    "float"
+  ]
+}
+<<< HTTP 200  (364 ms)  content-type=application/json
+<<< shape:
+  $: dict[5]
+    'id': str "embd-a54851bf2ee1be3d"
+    'embeddings': dict[1]
+      'float': list len=1
+        [0]: list[number] len=2048 head=[0.08534, 0.02687, -0.03578]
+    'texts': list len=1
+      [0]: str "Hybrid RAG combines keyword and vector search."
+    'meta': dict[2]
+      'api_version': dict[1]
+        'version': str "2"
+      'billed_units': dict[2]
+        'input_tokens': int 11
+        'image_tokens': int 0
+    'response_type': str "embeddings_by_type"
+    vectors=1 dims=[2048] COURSE_EMBED_DIM=unset match=n/a
+
+--- :9002 POST /v1/embeddings (OpenAI shape)
+>>> POST http://dobolyi.com:9002/v1/embeddings
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "nvidia/Nemotron-3-Embed-1B-BF16",
+  "input": [
+    "Hybrid RAG combines keyword and vector search.",
+    "The quarterly revenue grew by ten percent."
+  ]
+}
+<<< HTTP 200  (425 ms)  content-type=application/json
+<<< shape:
+  $: dict[6]
+    'id': str "embd-9752bcde92dbe225"
+    'object': str "list"
+    'created': int 1789760085
+    'model': str "nvidia/Nemotron-3-Embed-1B-BF16"
+    'data': list len=2
+      [0]: dict[3]
+        'index': int 0
+        'object': str "embedding"
+        'embedding': list[number] len=2048 head=[0.4042, 0.01285, -0.1284]
+      [1]: dict[3]
+        'index': int 1
+        'object': str "embedding"
+        'embedding': list[number] len=2048 head=[0.3633, -0.004931, -0.08166]
+    'usage': dict[5]
+      'prompt_tokens': int 19
+      'total_tokens': int 19
+      'completion_tokens': int 0
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': NoneType None
+    vectors=2 dims=[2048] COURSE_EMBED_DIM=unset match=n/a
+    cosine(text0, text1)=0.5185
+
+==================== :9003
+
+--- :9003 GET /v1/models
+>>> GET http://dobolyi.com:9003/v1/models
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+<<< HTTP 200  (203 ms)  content-type=application/json
+<<< shape:
+  $: dict[2]
+    'object': str "list"
+    'data': list len=1
+      [0]: dict[8]
+        'id': str "Qwen/Qwen3-VL-Embedding-2B"
+        'object': str "model"
+        'created': int 1789760085
+        'owned_by': str "vllm"
+        'root': str "Qwen/Qwen3-VL-Embedding-2B"
+        'parent': NoneType None
+        'max_model_len': int 8192
+        'permission': list len=1
+          [0]: dict[12]
+            'id': str "modelperm-bd0aa628c2f1f269"
+            'object': str "model_permission"
+            'created': int 1789760085
+            'allow_create_engine': bool False
+            'allow_sampling': bool True
+            'allow_logprobs': bool True
+            'allow_search_indices': bool False
+            'allow_view': bool True
+            'allow_fine_tuning': bool False
+            'organization': str "*"
+            'group': NoneType None
+            'is_blocking': bool False
+
+--- :9003 text input=str
+>>> POST http://dobolyi.com:9003/v1/embeddings
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "Qwen/Qwen3-VL-Embedding-2B",
+  "input": "a pipeline diagram",
+  "encoding_format": "float"
+}
+<<< HTTP 200  (417 ms)  content-type=application/json
+<<< shape:
+  $: dict[6]
+    'id': str "embd-ac01eac458c1784a"
+    'object': str "list"
+    'created': int 1789760085
+    'model': str "Qwen/Qwen3-VL-Embedding-2B"
+    'data': list len=1
+      [0]: dict[3]
+        'index': int 0
+        'object': str "embedding"
+        'embedding': list[number] len=2048 head=[0.003107, -0.00449, -0.0008036]
+    'usage': dict[5]
+      'prompt_tokens': int 4
+      'total_tokens': int 4
+      'completion_tokens': int 0
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': NoneType None
+    dim=2048
+
+--- :9003 text messages
+>>> POST http://dobolyi.com:9003/v1/embeddings
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "Qwen/Qwen3-VL-Embedding-2B",
+  "encoding_format": "float",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "a pipeline diagram"
+        }
+      ]
+    }
+  ]
+}
+<<< HTTP 200  (426 ms)  content-type=application/json
+<<< shape:
+  $: dict[6]
+    'id': str "embd-8d149fccb6cf4c60"
+    'object': str "list"
+    'created': int 1789760086
+    'model': str "Qwen/Qwen3-VL-Embedding-2B"
+    'data': list len=1
+      [0]: dict[3]
+        'index': int 0
+        'object': str "embedding"
+        'embedding': list[number] len=2048 head=[-0.01708, 0.001914, -0.002111]
+    'usage': dict[5]
+      'prompt_tokens': int 19
+      'total_tokens': int 19
+      'completion_tokens': int 0
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': NoneType None
+    dim=2048
+
+--- :9003 image A messages
+>>> POST http://dobolyi.com:9003/v1/embeddings
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "Qwen/Qwen3-VL-Embedding-2B",
+  "encoding_format": "float",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAA...<2874 chars>"
+          }
+        }
+      ]
+    }
+  ]
+}
+<<< HTTP 200  (462 ms)  content-type=application/json
+<<< shape:
+  $: dict[6]
+    'id': str "embd-a1dd68d3ac22bbdc"
+    'object': str "list"
+    'created': int 1789760086
+    'model': str "Qwen/Qwen3-VL-Embedding-2B"
+    'data': list len=1
+      [0]: dict[3]
+        'index': int 0
+        'object': str "embedding"
+        'embedding': list[number] len=2048 head=[-0.007857, 0.01347, -0.01652]
+    'usage': dict[5]
+      'prompt_tokens': int 78
+      'total_tokens': int 78
+      'completion_tokens': int 0
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': NoneType None
+    dim=2048
+
+--- :9003 image B messages
+>>> POST http://dobolyi.com:9003/v1/embeddings
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "Qwen/Qwen3-VL-Embedding-2B",
+  "encoding_format": "float",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAA...<2922 chars>"
+          }
+        }
+      ]
+    }
+  ]
+}
+<<< HTTP 200  (374 ms)  content-type=application/json
+<<< shape:
+  $: dict[6]
+    'id': str "embd-839efcd6de1e9f3a"
+    'object': str "list"
+    'created': int 1789760087
+    'model': str "Qwen/Qwen3-VL-Embedding-2B"
+    'data': list len=1
+      [0]: dict[3]
+        'index': int 0
+        'object': str "embedding"
+        'embedding': list[number] len=2048 head=[0.01178, -0.008417, -0.01185]
+    'usage': dict[5]
+      'prompt_tokens': int 78
+      'total_tokens': int 78
+      'completion_tokens': int 0
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': NoneType None
+    dim=2048
+
+--- :9003 image input=[data-uri]
+>>> POST http://dobolyi.com:9003/v1/embeddings
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "Qwen/Qwen3-VL-Embedding-2B",
+  "input": [
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAA...<2874 chars>"
+  ],
+  "encoding_format": "float"
+}
+<<< HTTP 200  (436 ms)  content-type=application/json
+<<< shape:
+  $: dict[6]
+    'id': str "embd-8c5b752c83ca0e8d"
+    'object': str "list"
+    'created': int 1789760087
+    'model': str "Qwen/Qwen3-VL-Embedding-2B"
+    'data': list len=1
+      [0]: dict[3]
+        'index': int 0
+        'object': str "embedding"
+        'embedding': list[number] len=2048 head=[-0.02133, -0.01502, -0.03158]
+    'usage': dict[5]
+      'prompt_tokens': int 2055
+      'total_tokens': int 2055
+      'completion_tokens': int 0
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': NoneType None
+    dim=2048
+    cosine(imageA, imageB)=0.5598  (1.0000 would mean the image is ignored)
+    cosine(input=[data-uri], text)=0.4709
+    TEXT CAN SHARE THE VISUAL SPACE via [text input=str]: same dim=True, cosine(text, imageA)=0.3261, cosine(text, imageB)=0.0150
+    TEXT CAN SHARE THE VISUAL SPACE via [text messages]: same dim=True, cosine(text, imageA)=0.6136, cosine(text, imageB)=0.2124
+
+==================== :9004
+
+--- :9004 GET /v1/models
+>>> GET http://dobolyi.com:9004/v1/models
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+<<< HTTP 200  (227 ms)  content-type=application/json
+<<< shape:
+  $: dict[2]
+    'object': str "list"
+    'data': list len=1
+      [0]: dict[8]
+        'id': str "Qwen/Qwen3-VL-Reranker-2B"
+        'object': str "model"
+        'created': int 1789760087
+        'owned_by': str "vllm"
+        'root': str "Qwen/Qwen3-VL-Reranker-2B"
+        'parent': NoneType None
+        'max_model_len': int 8192
+        'permission': list len=1
+          [0]: dict[12]
+            'id': str "modelperm-92a6bc3a168d54d6"
+            'object': str "model_permission"
+            'created': int 1789760087
+            'allow_create_engine': bool False
+            'allow_sampling': bool True
+            'allow_logprobs': bool True
+            'allow_search_indices': bool False
+            'allow_view': bool True
+            'allow_fine_tuning': bool False
+            'organization': str "*"
+            'group': NoneType None
+            'is_blocking': bool False
+
+--- :9004 POST /rerank (text docs)
+>>> POST http://dobolyi.com:9004/rerank
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "Qwen/Qwen3-VL-Reranker-2B",
+  "query": "How does hybrid retrieval work?",
+  "documents": [
+    "Hybrid RAG merges BM25 keyword results with dense vector results.",
+    "Gradio serves apps on port 7860 by default.",
+    "The cafeteria menu changes every Tuesday."
+  ]
+}
+<<< HTTP 200  (274 ms)  content-type=application/json
+<<< shape:
+  $: dict[4]
+    'id': str "score-9b2daea5042e59e2"
+    'model': str "Qwen/Qwen3-VL-Reranker-2B"
+    'usage': dict[2]
+      'prompt_tokens': int 249
+      'total_tokens': int 249
+    'results': list len=3
+      [0]: dict[3]
+        'index': int 0
+        'document': dict[2]
+          'text': str "Hybrid RAG merges BM25 keyword results with dense vector results."
+          'multi_modal': NoneType None
+        'relevance_score': float 0.6446927785873413
+      [1]: dict[3]
+        'index': int 2
+        'document': dict[2]
+          'text': str "The cafeteria menu changes every Tuesday."
+          'multi_modal': NoneType None
+        'relevance_score': float 0.19828854501247406
+      [2]: dict[3]
+        'index': int 1
+        'document': dict[2]
+          'text': str "Gradio serves apps on port 7860 by default."
+          'multi_modal': NoneType None
+        'relevance_score': float 0.12701791524887085
+
+--- :9004 POST /v1/rerank (text docs)
+>>> POST http://dobolyi.com:9004/v1/rerank
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "Qwen/Qwen3-VL-Reranker-2B",
+  "query": "How does hybrid retrieval work?",
+  "documents": [
+    "Hybrid RAG merges BM25 keyword results with dense vector results.",
+    "Gradio serves apps on port 7860 by default.",
+    "The cafeteria menu changes every Tuesday."
+  ]
+}
+<<< HTTP 200  (273 ms)  content-type=application/json
+<<< shape:
+  $: dict[4]
+    'id': str "score-80c327b9dac353cb"
+    'model': str "Qwen/Qwen3-VL-Reranker-2B"
+    'usage': dict[2]
+      'prompt_tokens': int 249
+      'total_tokens': int 249
+    'results': list len=3
+      [0]: dict[3]
+        'index': int 0
+        'document': dict[2]
+          'text': str "Hybrid RAG merges BM25 keyword results with dense vector results."
+          'multi_modal': NoneType None
+        'relevance_score': float 0.6582958102226257
+      [1]: dict[3]
+        'index': int 2
+        'document': dict[2]
+          'text': str "The cafeteria menu changes every Tuesday."
+          'multi_modal': NoneType None
+        'relevance_score': float 0.1918509602546692
+      [2]: dict[3]
+        'index': int 1
+        'document': dict[2]
+          'text': str "Gradio serves apps on port 7860 by default."
+          'multi_modal': NoneType None
+        'relevance_score': float 0.12894085049629211
+
+--- :9004 POST /rerank (one doc holding two images)
+>>> POST http://dobolyi.com:9004/rerank
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "Qwen/Qwen3-VL-Reranker-2B",
+  "query": "a red pipeline diagram",
+  "documents": {
+    "content": [
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAA...<2874 chars>"
+        }
+      },
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAA...<2922 chars>"
+        }
+      }
+    ]
+  }
+}
+<<< HTTP 200  (282 ms)  content-type=application/json
+<<< shape:
+  $: dict[4]
+    'id': str "score-afe392dc892dcf48"
+    'model': str "Qwen/Qwen3-VL-Reranker-2B"
+    'usage': dict[2]
+      'prompt_tokens': int 194
+      'total_tokens': int 194
+    'results': list len=1
+      [0]: dict[3]
+        'index': int 0
+        'document': dict[2]
+          'text': NoneType None
+          'multi_modal': list len=2
+            [0]: dict[2]
+              'image_url': dict[1]
+                'url': str "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAAAWZq/8AAAIIUlEQVR4nO3cf2ic9QHH8e9zlzRtYi/pGWvv4tL8MjZJsxiTWtvm/CPIsC1dA/ujEzdWWqhsc+yXjq2rYguyP2Qbw+...<2874 chars>"
+              'type': str "image_url"
+            [1]: dict[2]
+              'image_url': dict[1]
+                'url': str "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAAAWZq/8AAAIRklEQVR4nO3cfUxV9x3H8d859wKKKQpVKw9FqkgBn0CgMpXZWm0EQqVZOrW6zNTEZg/JUmcb55xZ3UzM6jTLmm3Jsj...<2922 chars>"
+              'type': str "image_url"
+        'relevance_score': float 0.7381897568702698
+
+--- :9004 POST /rerank (list of image docs)
+>>> POST http://dobolyi.com:9004/rerank
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "Qwen/Qwen3-VL-Reranker-2B",
+  "query": "a red pipeline diagram",
+  "documents": [
+    {
+      "content": [
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAA...<2874 chars>"
+          }
+        }
+      ]
+    },
+    {
+      "content": [
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAA...<2922 chars>"
+          }
+        }
+      ]
+    }
+  ]
+}
+<<< HTTP 200  (280 ms)  content-type=application/json
+<<< shape:
+  $: dict[4]
+    'id': str "score-9089f27913b55647"
+    'model': str "Qwen/Qwen3-VL-Reranker-2B"
+    'usage': dict[2]
+      'prompt_tokens': int 264
+      'total_tokens': int 264
+    'results': list len=2
+      [0]: dict[3]
+        'index': int 0
+        'document': dict[2]
+          'text': NoneType None
+          'multi_modal': list len=1
+            [0]: dict[2]
+              'image_url': dict[1]
+                'url': str "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAAAWZq/8AAAIIUlEQVR4nO3cf2ic9QHH8e9zlzRtYi/pGWvv4tL8MjZJsxiTWtvm/CPIsC1dA/ujEzdWWqhsc+yXjq2rYguyP2Qbw+...<2874 chars>"
+              'type': str "image_url"
+        'relevance_score': float 0.8042645454406738
+      [1]: dict[3]
+        'index': int 1
+        'document': dict[2]
+          'text': NoneType None
+          'multi_modal': list len=1
+            [0]: dict[2]
+              'image_url': dict[1]
+                'url': str "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAIAAAAWZq/8AAAIRklEQVR4nO3cfUxV9x3H8d859wKKKQpVKw9FqkgBn0CgMpXZWm0EQqVZOrW6zNTEZg/JUmcb55xZ3UzM6jTLmm3Jsj...<2922 chars>"
+              'type': str "image_url"
+        'relevance_score': float 0.23916256427764893
+
+==================== :9005
+
+--- :9005 GET /v1/models
+>>> GET http://dobolyi.com:9005/v1/models
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+<<< HTTP 200  (194 ms)  content-type=application/json
+<<< shape:
+  $: dict[2]
+    'object': str "list"
+    'data': list len=1
+      [0]: dict[8]
+        'id': str "dots.mocr"
+        'object': str "model"
+        'created': int 1789760089
+        'owned_by': str "vllm"
+        'root': str "dots-studio/dots.mocr"
+        'parent': NoneType None
+        'max_model_len': int 8192
+        'permission': list len=1
+          [0]: dict[12]
+            'id': str "modelperm-8e0d644bc2a1338c"
+            'object': str "model_permission"
+            'created': int 1789760089
+            'allow_create_engine': bool False
+            'allow_sampling': bool True
+            'allow_logprobs': bool True
+            'allow_search_indices': bool False
+            'allow_view': bool True
+            'allow_fine_tuning': bool False
+            'organization': str "*"
+            'group': NoneType None
+            'is_blocking': bool False
+
+    (small PDF generated in-memory: 1058 bytes; page 1 rendered to PNG because this service is a chat/vision OCR model)
+
+--- :9005 chat OCR of PDF page
+>>> POST http://dobolyi.com:9005/v1/chat/completions
+>>> headers: {'Authorization': 'Bearer <REDACTED>', 'Content-Type': 'application/json'}
+>>> body: {
+  "model": "dots.mocr",
+  "max_tokens": 300,
+  "temperature": 0,
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAH0CAIAAA...<18782 chars>"
+          }
+        },
+        {
+          "type": "text",
+          "text": "Extract the text content from this image."
+        }
+      ]
+    }
+  ]
+}
+<<< HTTP 200  (386 ms)  content-type=application/json
+<<< shape:
+  $: dict[14]
+    'id': str "chatcmpl-8afea458433d13cc"
+    'object': str "chat.completion"
+    'created': int 1789760089
+    'model': str "dots.mocr"
+    'choices': list len=1
+      [0]: dict[7]
+        'index': int 0
+        'message': dict[7]
+          'role': str "assistant"
+          'content': str "Hybrid RAG combines keyword search with vector search, then reranks."
+          'refusal': NoneType None
+          'annotations': NoneType None
+          'audio': NoneType None
+          'function_call': NoneType None
+          'reasoning': NoneType None
+        'logprobs': NoneType None
+        'finish_reason': str "stop"
+        'stop_reason': int 151673
+        'token_ids': NoneType None
+        'routed_experts': NoneType None
+    'service_tier': NoneType None
+    'system_fingerprint': str "vllm-0.29.0-f4f7af21"
+    'usage': dict[5]
+      'prompt_tokens': int 536
+      'total_tokens': int 552
+      'completion_tokens': int 16
+      'prompt_tokens_details': NoneType None
+      'completion_tokens_details': NoneType None
+    'prompt_logprobs': NoneType None
+    'prompt_token_ids': NoneType None
+    'prompt_text': NoneType None
+    'kv_transfer_params': NoneType None
+    'ec_transfer_params': NoneType None
+    'metrics': NoneType None
+
+==================== summary (label -> HTTP status)
+    200  :9001 GET /v1/models
+    200  :9001 chat text-only
+    200  :9001 chat text-only, thinking disabled
+    200  :9001 chat with image part (thinking disabled)
+    200  :9001 chat response_format=json_schema
+    200  :9001 chat response_format=json_object
+    200  :9002 GET /v1/models
+    400  :9002 POST /v2/embed (contract endpoint)
+    200  :9002 POST /v2/embed input_type=document
+    200  :9002 POST /v2/embed input_type=query
+    200  :9002 POST /v1/embeddings (OpenAI shape)
+    200  :9003 GET /v1/models
+    200  :9003 text input=str
+    200  :9003 text messages
+    200  :9003 image A messages
+    200  :9003 image B messages
+    200  :9003 image input=[data-uri]
+    200  :9004 GET /v1/models
+    200  :9004 POST /rerank (text docs)
+    200  :9004 POST /v1/rerank (text docs)
+    200  :9004 POST /rerank (one doc holding two images)
+    200  :9004 POST /rerank (list of image docs)
+    200  :9005 GET /v1/models
+    200  :9005 chat OCR of PDF page

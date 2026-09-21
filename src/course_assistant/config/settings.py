@@ -25,33 +25,45 @@ def _get(key: str, default: str = "") -> str:
     return os.environ.get(key) or os.environ.get("COURSE_" + key) or default
 
 
+def redact(text: str, *secrets: str) -> str:
+    """Strip secrets (the class API key by default) from text shown to users/logs."""
+    secrets = secrets or (os.environ.get("COURSE_API_KEY", ""),)
+    for s in secrets:
+        if s:
+            text = text.replace(s, "<REDACTED>")
+    return text
+
+
 class Settings:
     def __init__(self) -> None:
-        self.api_key = _get("COURSE_API_KEY", "dummy-api-key")
+        # No usable default: full mode fails loudly if the key is missing.
+        self.api_key = _get("COURSE_API_KEY", "")
 
-        # Answering / vision LLM
+        # Defaults below are the live contract verified by probe_endpoints.py.
+        # Answering / vision LLM (a reasoning model; thinking disabled per call)
         self.llm_base_url = _get("COURSE_LLM_BASE_URL", "http://dobolyi.com:9001/v1")
-        self.llm_model = _get("COURSE_LLM_MODEL", "deepseek-v4-flash-0731")
+        self.llm_model = _get("COURSE_LLM_MODEL", "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit")
         self.llm_api_key = self.api_key
 
-        # Text embeddings
-        self.text_embed_base_url = _get("COURSE_TEXT_EMBED_BASE_URL", "http://dobolyi.com:9002/v1")
-        self.text_embed_model = _get("COURSE_TEXT_EMBED_MODEL", "text-embedding-3-small")
+        # Text embeddings: Cohere-style POST {base}/v2/embed
+        self.text_embed_base_url = _get("COURSE_TEXT_EMBED_BASE_URL", "http://dobolyi.com:9002")
+        self.text_embed_model = _get("COURSE_TEXT_EMBED_MODEL", "nvidia/Nemotron-3-Embed-1B-BF16")
 
-        # Visual embeddings
+        # Visual embeddings: POST {base}/embeddings with chat-style messages
         self.visual_embed_base_url = _get("COURSE_VISUAL_EMBED_BASE_URL", "http://dobolyi.com:9003/v1")
-        self.visual_embed_model = _get("COURSE_VISUAL_EMBED_MODEL", "vision-embedding")
+        self.visual_embed_model = _get("COURSE_VISUAL_EMBED_MODEL", "Qwen/Qwen3-VL-Embedding-2B")
 
-        # Reranker
-        self.rerank_base_url = _get("COURSE_RERANK_BASE_URL", "http://dobolyi.com:9004/v1")
-        self.rerank_model = _get("COURSE_RERANK_MODEL", "rerank-multilingual-v3")
+        # Reranker: POST {base}/rerank
+        self.rerank_base_url = _get("COURSE_RERANK_BASE_URL", "http://dobolyi.com:9004")
+        self.rerank_model = _get("COURSE_RERANK_MODEL", "Qwen/Qwen3-VL-Reranker-2B")
 
-        # Document parsing
+        # Document OCR (chat completions); the default parser is PyMuPDF
         self.parse_base_url = _get("COURSE_PARSE_BASE_URL", "http://dobolyi.com:9005/v1")
-        self.parse_model = _get("COURSE_PARSE_MODEL", "doc-parser")
+        self.parse_model = _get("COURSE_PARSE_MODEL", "dots.mocr")
 
-        # Embeds dimension (text)
-        self.embed_dim = int(_get("COURSE_EMBED_DIM", "1536"))
+        # Embedding dimensions (text and visual spaces are separate collections)
+        self.embed_dim = int(_get("COURSE_EMBED_DIM", "2048"))
+        self.visual_embed_dim = int(_get("COURSE_VISUAL_EMBED_DIM", "2048"))
 
         # Text chunking
         self.chunk_size = int(_get("CHUNK_SIZE", "1200"))

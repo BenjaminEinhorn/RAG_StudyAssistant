@@ -4,7 +4,7 @@ Keeps:
 - text chunks in Chroma (vector) *and* BM25 (keyword),
 - slide images in a separate Chroma "visual" collection,
 - a JSONL registry of every chunk (source of truth for removal/rebuild),
-- re-ranking of keyword+vector candidates.
+- reciprocal-rank fusion of keyword+vector candidates, then re-ranking.
 
 Document add/remove keeps text and visual indexes separate, and removal drops
 the document's chunks AND images so later answers never rely on removed files.
@@ -48,7 +48,7 @@ class Catalog:
     settings: Settings
     text_embedder: EmbeddingProvider
     visual_embedder: EmbeddingProvider
-    reranker: Reranker
+    reranker: Reranker | None      # None = rerank off (fused order kept)
     chunk_method: str = "recursive"
     _chunks: dict = field(default_factory=dict)   # chunk_id -> Chunk
     _bm25: object = None
@@ -61,12 +61,24 @@ class Catalog:
 
         self.settings.chroma_dir.mkdir(parents=True, exist_ok=True)
         self._chroma = chromadb.PersistentClient(path=str(self.settings.chroma_dir))
-        self._text_col = self._chroma.get_or_create_collection(
-            "text", metadata={"hnsw:space": "cosine"})
-        self._visual_col = self._chroma.get_or_create_collection(
-            "visual", metadata={"hnsw:space": "cosine"})
+        self._text_col = self._open_collection("text", self.text_embedder)
+        self._visual_col = self._open_collection("visual", self.visual_embedder)
         self._load_registry()
         self._build_bm25()
+
+    def _open_collection(self, name: str, embedder: EmbeddingProvider):
+        """Open a collection, refusing one filled by a different embedder
+        (e.g. an index built in local mode opened in full mode)."""
+        col = self._chroma.get_or_create_collection(
+            name, metadata={"hnsw:space": "cosine", "embedder": embedder.name})
+        built_with = (col.metadata or {}).get("embedder")
+        if built_with != embedder.name and col.count() > 0:
+            raise RuntimeError(
+                f"The '{name}' index in {self.settings.chroma_dir} was built with "
+                f"embedder '{built_with}', but the current one is '{embedder.name}'. "
+                "Vectors from different embedders are not comparable: delete the "
+                "data directory and re-ingest, or switch COURSE_BUILD_MODE back.")
+        return col
 
     # ------------------------------------------------------------ persistence
     def _chunk_id(self, c: Chunk) -> str:
@@ -190,36 +202,45 @@ class Catalog:
         return {"ok": True, "message": f"Removed '{doc_name}' and its searchable content."}
 
     # ------------------------------------------------------------ retrieval
+    RRF_K = 60          # reciprocal-rank-fusion constant (Cormack et al.)
+
+    def _pool_size(self, k: int) -> int:
+        """Candidates fetched from each retriever before fusion/rerank."""
+        return max(20, 4 * k)
+
     def _merge_candidates(self, query: str, k: int) -> list[RetrievedChunk]:
-        ids_to_score: dict[str, float] = {}
-        # keyword
+        if not self._chunks:
+            return []
+        fused: dict[str, float] = {}
+        pool = self._pool_size(k)
+        # keyword (BM25); zero-score hits share no terms with the query
         if self._bm25:
             q = __import__("bm25s", fromlist=["tokenize"]).tokenize([query])
-            nk = min(max(6, k), len(self._text_list))  # bm25s: k <= corpus size
+            nk = min(pool, len(self._text_list))  # bm25s: k <= corpus size
             results, scores = self._bm25.retrieve(q, k=nk)
+            rank = 0
             for j, idx in enumerate(results[0]):
-                if idx < len(self._chunk_ids):
+                if idx < len(self._chunk_ids) and float(scores[0][j]) > 0:
                     cid = self._chunk_ids[int(idx)]
-                    ids_to_score[cid] = max(ids_to_score.get(cid, 0), float(scores[0][j]))
-        # vector (text)
-        qv = self.text_embedder.embed_texts([query])[0]
-        nvec = min(max(6, k), max(1, len(self._chunks)))
-        res = self._text_col.query(query_embeddings=[qv], n_results=nvec)
-        for i, row in enumerate(res.get("ids", [[]])[0]):
-            meta = res["metadatas"][0][i]
-            ids_to_score[row] = max(ids_to_score.get(row, 0), 1.0 - i * 0.05)
-        # build candidate objects with combined keyword+vector score
+                    fused[cid] = fused.get(cid, 0.0) + 1.0 / (self.RRF_K + rank)
+                    rank += 1
+        # vector (text embeddings of the query)
+        qv = self.text_embedder.embed_query(query)
+        res = self._text_col.query(query_embeddings=[qv],
+                                   n_results=min(pool, len(self._chunks)))
+        for rank, cid in enumerate(res.get("ids", [[]])[0]):
+            fused[cid] = fused.get(cid, 0.0) + 1.0 / (self.RRF_K + rank)
         cands = []
-        for cid, base in ids_to_score.items():
+        for cid, base in fused.items():
             c = self._chunks.get(cid)
             if c is None:
                 continue
             cands.append(RetrievedChunk(
                 chunk_id=cid, doc_id=c.doc_id, doc_name=c.doc_name,
                 page=c.page, text=c.text, image_path=c.image_path, score=base))
-        if not cands:
-            return []
-        # rerank
+        cands.sort(key=lambda c: c.score, reverse=True)
+        if self.reranker is None or not cands:
+            return cands[:k]
         scores = self.reranker.rescore(query, [c.text for c in cands])
         for c, s in zip(cands, scores):
             c.score = s
@@ -240,15 +261,24 @@ class Catalog:
         return results
 
     def visual_search(self, query: str, k: int = 3) -> list[RetrievedSlide]:
-        qv = self.visual_embedder.embed_texts([query])[0]
-        try:
-            res = self._visual_col.query(query_embeddings=[qv], n_results=max(1, k))
-        except Exception:
+        """Slides whose *image* matches the query (text query embedded into the
+        visual space), reranked by the multimodal reranker when available."""
+        n_images = self._visual_col.count()
+        if n_images == 0:
             return []
+        qv = self.visual_embedder.embed_query(query)
+        res = self._visual_col.query(query_embeddings=[qv],
+                                     n_results=min(n_images, max(k, 2 * k if self.reranker else k)))
         out = []
         for meta, dist in zip(res["metadatas"][0], res["distances"][0]):
             out.append(RetrievedSlide(
                 doc_id=meta["doc_id"], doc_name=meta["doc_name"],
                 page=meta["page"], image_path=meta["image_path"],
-                text=meta.get("text", ""), score=float(dist)))
-        return out
+                text=meta.get("text", ""), score=1.0 - float(dist)))
+        if self.reranker is not None and out:
+            scores = self.reranker.rescore_images(query, [s.image_path for s in out])
+            if scores is not None:
+                for s, sc in zip(out, scores):
+                    s.score = sc
+                out.sort(key=lambda s: s.score, reverse=True)
+        return out[:k]

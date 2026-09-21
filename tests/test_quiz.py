@@ -72,3 +72,33 @@ def test_generate_quiz_offline_fallback_produces_grounded_quiz(app_state, small_
         # the correct statement is verbatim from the source excerpt
         assert q.choices[q.answer_index] in q.source_excerpt
         assert q.explanation
+
+
+class _QuizChat:
+    def __init__(self, questions):
+        self.questions = questions
+
+    def complete_json(self, system, user, schema, images=None):
+        return {"questions": self.questions}
+
+
+def test_live_quiz_uses_each_questions_cited_source_and_drops_invalid(app_state, small_doc, tmp_path):
+    other = tmp_path / "other.txt"
+    other.write_text("Reranking reorders candidate chunks by relevance score.")
+    app_state.catalog.add_file(str(small_doc))
+    app_state.catalog.add_file(str(other))
+    chunks = app_state.catalog.search("reranking relevance", k=8)
+    rerank_n = next(i for i, c in enumerate(chunks, 1) if c.doc_name == "other.txt")
+    quiz = generate_quiz(app_state.catalog, _QuizChat([
+        {"question": "What does reranking do?", "choices": ["a", "reorders chunks", "c", "d"],
+         "answer_index": 1, "explanation": "e", "source": rerank_n,
+         "excerpt": "reorders candidate chunks"},
+        {"question": "bad key", "choices": ["a", "b"], "answer_index": 5,
+         "explanation": "e", "source": 1, "excerpt": ""},
+        {"question": "bad source", "choices": ["a", "b"], "answer_index": 0,
+         "explanation": "e", "source": 42, "excerpt": ""},
+    ]), "reranking relevance", num_questions=3)
+    assert quiz.total() == 1
+    q = quiz.questions[0]
+    assert q.source_doc == "other.txt"
+    assert q.source_excerpt == "reorders candidate chunks"

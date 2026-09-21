@@ -1,8 +1,13 @@
 """End-to-end tests: exercise the real Gradio handler functions end to end
 (add->ask->dedup->remove->quiz), in local (offline) mode.
 """
-from conftest import REAL_DECK_W2, needs_decks
-from course_assistant.ui.app import add_file_handler, ask_handler, remove_handler
+import pytest
+
+pytest.importorskip("gradio")  # skip, not abort, on a bare clone without gradio
+
+from conftest import REAL_DECK_W2, needs_decks  # noqa: E402
+from course_assistant.ui.app import (add_file_handler, ask_handler,  # noqa: E402
+                                     quiz_feedback, remove_handler)
 
 
 @needs_decks
@@ -47,3 +52,19 @@ def test_removed_doc_does_not_leak_into_answer(app_state, small_doc):
     res = app_state.assistant.answer("hybrid RAG")
     # no sources from the removed doc
     assert not any(s.doc_name == "notes.txt" for s in res.sources)
+
+
+def test_quiz_feedback_scores_against_key_and_cites_sources(app_state, small_doc):
+    from course_assistant.core.quiz import generate_quiz
+
+    add_file_handler(app_state, str(small_doc), [])
+    quiz = generate_quiz(app_state.catalog, app_state.assistant.chat, "RAG",
+                         num_questions=2)
+    key = {i: q.answer_index for i, q in enumerate(quiz.questions)}
+    md = quiz_feedback(quiz, key)
+    assert f"Score: {quiz.total()} / {quiz.total()}" in md
+    assert "Source: notes.txt" in md
+    wrong = {0: (quiz.questions[0].answer_index + 1) % len(quiz.questions[0].choices)}
+    assert f"Score: 0 / {quiz.total()}" in quiz_feedback(quiz, wrong)
+    revealed = quiz_feedback(quiz, {}, reveal_all=True)
+    assert "Answer key" in revealed and "correct answer" in revealed

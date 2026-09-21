@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 
 from ..config.settings import Settings
 from ..services.chat import ChatProvider
+from .assistant import excerpt_in_text
 from .index import Catalog, RetrievedChunk
 
 
@@ -164,20 +165,45 @@ def _offline_quiz(chunks, num_questions: int) -> Quiz:
     return Quiz(topic="Quiz", questions=questions)
 
 
+QUIZ_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["questions"],
+    "properties": {"questions": {"type": "array", "items": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["question", "choices", "answer_index", "explanation",
+                     "source", "excerpt"],
+        "properties": {
+            "question": {"type": "string"},
+            "choices": {"type": "array", "items": {"type": "string"}},
+            "answer_index": {"type": "integer"},
+            "explanation": {"type": "string"},
+            "source": {"type": "integer"},
+            "excerpt": {"type": "string"},
+        }}}},
+}
+
+
 def generate_quiz(catalog: Catalog, chat: ChatProvider,
                   topic: str, doc_names: list[str] | None = None,
                   num_questions: int = 5, context_k: int = 8,
                   chunk_method: str = "recursive") -> Quiz:
     """Generate MCQs grounded in the retrieved course material.
 
-    Uses the live LLM when available; falls back to a deterministic offline
-    generator (verbatim slide sentences) when the model is unavailable or its
-    output cannot be parsed, so the Quiz tab works before keys are configured.
+    With the live LLM, each question must cite the excerpt number it is based
+    on plus a verbatim quote; questions with an out-of-range key or source are
+    dropped, and errors propagate so the UI can show them. The deterministic
+    offline generator (verbatim slide sentences) is used only in local mode.
     """
+    from ..services.chat import LocalEchoChat
+
     chunks = catalog.search(topic, k=context_k, doc_names=doc_names)
     if not chunks:
         raise ValueError("No course material matched this topic. Try a broader "
                          "topic or select a different document.")
+    if isinstance(chat, LocalEchoChat):
+        return _offline_quiz(chunks, num_questions)
     context_block = "\n\n".join(
         f"[{i}] ({c.doc_name}, slide/page {c.page})\n{c.text}"
         for i, c in enumerate(chunks, 1)
@@ -186,39 +212,39 @@ def generate_quiz(catalog: Catalog, chat: ChatProvider,
         f"Using ONLY the course material excerpts below, write {num_questions} "
         "multiple-choice quiz questions about this topic: " + topic + "\n\n"
         + context_block + "\n\n"
-        "Return a JSON object (no markdown) exactly like this:\n"
-        '{"questions":[{"question":"...","choices":["a","b","c","d"],'
-        '"answer_index":<0-based index of correct choice>,"explanation":"one '
-        'sentence, must be supported by the excerpt"}...]}\n'
-        "Every question MUST be answerable from the excerpts. For each question, "
-        "the correct answer must be the one the excerpt supports. Include "
-        "distractor choices."
+        "For each question give: question; exactly 4 choices; answer_index "
+        "(0-based index of the correct choice); explanation (one sentence that "
+        "names the document and slide); source (the excerpt number the answer "
+        "comes from); excerpt (a short phrase copied VERBATIM from that excerpt "
+        "that proves the answer). Every question MUST be answerable from its "
+        "cited excerpt, and exactly one choice may be correct."
     )
-    try:
-        raw = chat.complete(
-            "You generate pedagogically sound multiple-choice quiz questions that "
-            "are strictly answerable from provided course material.", prompt,
-        ).strip()
-        data = _extract_json(raw)
-        questions = []
-        for q in data.get("questions", []):
-            if not q.get("question") or len(q.get("choices", [])) < 2:
-                continue
-            q_obj = QuizQuestion(
-                question=q["question"],
-                choices=q["choices"],
-                answer_index=int(q["answer_index"]),
-                explanation=q.get("explanation", ""),
-                source_doc=chunks[0].doc_name,
-                source_page=chunks[0].page,
-                source_excerpt=chunks[0].text,
-            )
-            questions.append(q_obj)
-            if len(questions) >= num_questions:
-                break
-        if questions:
-            return Quiz(topic=topic, questions=questions)
-        raise ValueError("No valid questions returned by the model.")
-    except Exception:
-        # offline fallback (also used when no live LLM is configured)
-        return _offline_quiz(chunks, num_questions)
+    data = chat.complete_json(
+        "You generate pedagogically sound multiple-choice quiz questions that "
+        "are strictly answerable from provided course material.", prompt, QUIZ_SCHEMA)
+    questions = []
+    for q in data.get("questions", []):
+        choices = [str(c) for c in q.get("choices") or []]
+        n, key = q.get("source"), q.get("answer_index")
+        if (not q.get("question") or len(choices) < 2
+                or not isinstance(key, int) or not 0 <= key < len(choices)
+                or not isinstance(n, int) or not 1 <= n <= len(chunks)):
+            continue
+        chunk = chunks[n - 1]
+        excerpt = str(q.get("excerpt") or "")
+        questions.append(QuizQuestion(
+            question=q["question"],
+            choices=choices,
+            answer_index=key,
+            explanation=q.get("explanation", ""),
+            source_doc=chunk.doc_name,
+            source_page=chunk.page,
+            # show the model's quote only if it really occurs in the slide text
+            source_excerpt=(excerpt if excerpt_in_text(excerpt, chunk.text)
+                            else chunk.text[:400]),
+        ))
+        if len(questions) >= num_questions:
+            break
+    if not questions:
+        raise ValueError("The model returned no valid, source-grounded questions.")
+    return Quiz(topic=topic, questions=questions)

@@ -1,131 +1,230 @@
-"""RAG evaluation: answer-quality comparison across two design axes.
+"""A/B comparison of one RAG design choice: reranking ON vs OFF.
 
-For an identical question set (incl. >=2 visual questions and 1 unanswerable),
-we record retrieval correctness (top-3 contains the ground-truth slide), source
-support, and end-to-end latency for:
-  A) rerank ON  vs  rerank OFF
-  B) chunking: recursive vs fixed-size
+Both arms run the *full* answer stage (hybrid retrieval -> evidence ->
+class vision LLM -> structured answer + citations) over the same fixed
+question set and the same index, which is ingested once. The only difference:
 
-Runs in COURSE_BUILD_MODE=local (deterministic offline embedding) so it is
-repeatable without live keys. Results are written to results/comparison.json
-and a markdown table.
+  rerank_on   fused BM25 + text-vector candidates are rescored by the class
+              multimodal reranker (text chunks and slide images)
+  rerank_off  the reciprocal-rank-fused order is kept as-is
+
+Per question and arm it records, mechanically:
+  - target_retrieved      the ground-truth slide is in the evidence given to the LLM
+  - target_cited          the answer cites the ground-truth slide
+  - all_cited_in_evidence every cited source number is an item retrieval returned
+  - all_excerpts_found    every quoted excerpt occurs in the text of its cited chunk
+  - latency_s             end-to-end wall clock of Assistant.answer()
+  - retrieval_s           share of that spent in text + visual retrieval
+
+and leaves `correct` and `sources_support` EMPTY in the CSV for a human to
+grade. An LLM grading its own retrieval is not evidence.
+
+    COURSE_BUILD_MODE=full .venv/bin/python eval_compare.py
+    .venv/bin/python eval_compare.py --offline      # plumbing check only
 """
+from __future__ import annotations
+
+import argparse
+import csv
 import json
 import os
+import sys
+import tempfile
 import time
 from pathlib import Path
 
-os.environ["COURSE_BUILD_MODE"] = "local"
-import shutil
-import tempfile
-
-from course_assistant.config.settings import Settings
-from course_assistant.factory import build_app_state
-
-BASE = Path(__file__).resolve().parents[0]
+BASE = Path(__file__).resolve().parent
 MATERIALS = BASE / "data" / "materials"
+OUT = BASE / "results"
 
-# doc-name substrings used to match ground truth
-DOC = {
-    "w2": "Week 2", "w4": "Week 4", "w5": "Week 5",
-}
+DOC = {"w2": "Week 2", "w4": "Week 4", "w5": "Week 5"}
 
 QUESTIONS = [
-    # (q, expected_doc, expected_page)  page=None => unanswerable
-    ("What is retrieval augmented generation (RAG)?", DOC["w5"], 10),
-    ("Why use RAG? Give the benefits over training data.", DOC["w5"], 11),
-    ("What two components does hybrid RAG combine?", DOC["w5"], 18),
-    ("What does the 'Vibe Coding on Prod' meme show? (visual)", DOC["w2"], 33),
-    ("Describe what the hybrid RAG pipeline diagram shows. (visual)", DOC["w5"], 18),
-    ("What port does Gradio serve an app on by default?", DOC["w4"], 7),
-    ("What is semantic search typically based on?", DOC["w5"], 15),
-    ("Name two common chunking strategies.", DOC["w5"], 17),
-    ("Who won the 2024 Super Bowl and by how much?", None, None),  # unanswerable
-    ("How is RAG context optimization different from fine-tuning?", DOC["w5"], 13),
+    # (question, type, expected_doc, expected_page)  page=None => unanswerable
+    ("What is retrieval augmented generation (RAG)?", "text", DOC["w5"], 10),
+    ("Why use RAG? Give the benefits over training data.", "text", DOC["w5"], 11),
+    ("What two components does hybrid RAG combine?", "text", DOC["w5"], 18),
+    ("What does the 'Vibe Coding on Prod' meme show?", "visual", DOC["w2"], 33),
+    ("Describe what the hybrid RAG pipeline diagram shows.", "visual", DOC["w5"], 18),
+    ("What port does Gradio serve an app on by default?", "text", DOC["w4"], 7),
+    ("What is semantic search typically based on?", "text", DOC["w5"], 15),
+    ("Name two common chunking strategies.", "text", DOC["w5"], 17),
+    ("Who won the 2024 Super Bowl and by how much?", "unanswerable", None, None),
+    ("How is RAG context optimization different from fine-tuning?", "text", DOC["w5"], 13),
 ]
 
-CONFIGS = [
-    ("rerank_on/recursive", dict(rerank_enabled=True, chunk_method="recursive")),
-    ("rerank_off/recursive", dict(rerank_enabled=False, chunk_method="recursive")),
-    ("rerank_on/fixed", dict(rerank_enabled=True, chunk_method="fixed")),
-]
+ARMS = ("rerank_on", "rerank_off")
 
 
-def ingest(app, names):
-    for n in names:
-        p = MATERIALS / n
-        app.catalog.add_file(str(p))
+def _is_target(src, doc, page) -> bool:
+    return src is not None and doc is not None and doc in src.doc_name and src.page == page
 
 
-def build_cache_dir(base):
-    td = Path(tempfile.mkdtemp(prefix="eval_"))
-    os.environ["COURSE_DATA_DIR"] = str(td)
-    return td
+class _Timer:
+    """Accumulates wall-clock time spent inside wrapped callables."""
+
+    def __init__(self):
+        self.total = 0.0
+
+    def wrap(self, fn):
+        def inner(*a, **k):
+            t0 = time.perf_counter()
+            try:
+                return fn(*a, **k)
+            finally:
+                self.total += time.perf_counter() - t0
+        return inner
 
 
-def run_config(cfg_name, cfg, decks, gt):
-    td = build_cache_dir(None)
-    s = Settings()
-    app = build_app_state(s, chunk_method=cfg["chunk_method"],
-                           rerank_enabled=cfg["rerank_enabled"])
-    t_ing = time.time()
-    ingest(app, decks)
-    ingest_s = time.time() - t_ing
+def run_question(app, reranker, arm, qid, q, qtype, doc, page) -> dict:
+    app.catalog.reranker = reranker if arm == "rerank_on" else None
+    timer = _Timer()
+    search, visual = app.catalog.search, app.catalog.visual_search
+    app.catalog.search, app.catalog.visual_search = timer.wrap(search), timer.wrap(visual)
+    try:
+        t0 = time.perf_counter()
+        error = None
+        try:
+            res = app.assistant.answer(q)
+        except Exception as e:  # recorded, never hidden
+            res, error = None, f"{type(e).__name__}: {e}"
+        latency = time.perf_counter() - t0
+    finally:
+        app.catalog.search, app.catalog.visual_search = search, visual
+
+    row = {"arm": arm, "qid": qid, "question": q, "type": qtype,
+           "expected": f"{doc} slide {page}" if page else "(unanswerable)",
+           "latency_s": round(latency, 3), "retrieval_s": round(timer.total, 3),
+           "error": error}
+    if res is None:
+        return row
+    cites = res.citations
+    row.update({
+        "answer": res.answer,
+        "found": res.found_evidence,
+        "evidence": [f"{s.doc_name} p{s.page}" for s in res.evidence],
+        "cited": [f"[{c.number}] {c.source.doc_name} p{c.source.page}" if c.source
+                  else f"[{c.number}] (not in evidence)" for c in cites],
+        "excerpts": [c.excerpt for c in cites],
+        "images_shown": len(res.used_images),
+        "target_retrieved": (any(_is_target(s, doc, page) for s in res.evidence)
+                             if page else None),
+        "target_cited": (any(_is_target(c.source, doc, page) for c in cites)
+                         if page else None),
+        "all_cited_in_evidence": all(c.in_evidence for c in cites) if cites else None,
+        "all_excerpts_found": (all(c.excerpt_found for c in cites if c.excerpt.strip())
+                               if any(c.excerpt.strip() for c in cites) else None),
+        "abstained": not res.found_evidence,
+    })
+    return row
+
+
+def summarise(rows: list[dict]) -> dict:
+    out = {}
+    for arm in ARMS:
+        r = [x for x in rows if x["arm"] == arm]
+        ans = [x for x in r if x["type"] != "unanswerable" and not x["error"]]
+        una = [x for x in r if x["type"] == "unanswerable" and not x["error"]]
+        lat = sorted(x["latency_s"] for x in r)
+        ret = sorted(x["retrieval_s"] for x in r)
+
+        def frac(key, rows_):
+            vals = [x.get(key) for x in rows_ if x.get(key) is not None]
+            return f"{sum(bool(v) for v in vals)}/{len(vals)}"
+
+        out[arm] = {
+            "errors": sum(1 for x in r if x["error"]),
+            "target_retrieved": frac("target_retrieved", ans),
+            "target_cited": frac("target_cited", ans),
+            "all_cited_in_evidence": frac("all_cited_in_evidence", r),
+            "all_excerpts_found": frac("all_excerpts_found", r),
+            "unanswerable_abstained": frac("abstained", una),
+            "latency_median_s": lat[len(lat) // 2] if lat else None,
+            "latency_mean_s": round(sum(lat) / len(lat), 3) if lat else None,
+            "latency_max_s": lat[-1] if lat else None,
+            "retrieval_median_s": ret[len(ret) // 2] if ret else None,
+        }
+    return out
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--offline", action="store_true",
+                    help="allow COURSE_BUILD_MODE=local (plumbing check, NOT a result)")
+    ap.add_argument("--out", default=str(OUT), help="output directory")
+    args = ap.parse_args()
+
+    # isolated index for the run; the mode is whatever the environment says
+    os.environ["COURSE_DATA_DIR"] = tempfile.mkdtemp(prefix="eval_")
+    from course_assistant.config.settings import Settings
+    from course_assistant.factory import build_app_state
+
+    settings = Settings()
+    if settings.build_mode != "full":
+        if not args.offline:
+            sys.exit("Refusing to run: COURSE_BUILD_MODE is not 'full'. Offline hash "
+                     "embeddings are not semantic and the LLM is stubbed, so the numbers "
+                     "would mean nothing. Pass --offline to check plumbing anyway.")
+        print("!" * 72 + "\n!! OFFLINE MODE: stub LLM + hash embeddings. These numbers are "
+              "NOT a result.\n" + "!" * 72)
+
+    decks = sorted(MATERIALS.glob("*.pptx"))
+    if not decks:
+        sys.exit(f"No decks in {MATERIALS}; add the Week 2/4/5 .pptx files.")
+    app = build_app_state(settings, rerank_enabled=True)
+    reranker = app.catalog.reranker
+    t0 = time.perf_counter()
+    for d in decks:
+        print(app.catalog.add_file(str(d))["message"])
+    ingest_s = time.perf_counter() - t0
+
+    # one untimed warm-up so connection setup is not billed to the first arm
+    app.assistant.answer("warm-up: what is RAG?")
+
     rows = []
-    for q, doc_k, page in QUESTIONS:
-        t0 = time.time()
-        hits = app.catalog.search(q, k=6)
-        dt = time.time() - t0
-        top3 = hits[:3]
-        # correctness: ground-truth slide present among top 3 text sources
-        correct = doc_k and page is not None and any(
-            doc_k in h.doc_name and h.page == page for h in top3)
-        # source support: at least one top source shares substantive tokens
-        from course_assistant.services.reranker import _tokens
-        qt = _tokens(q)
-        support = any(_tokens(h.text) & qt for h in hits[:2])
-        rows.append({
-            "question": q, "expected_doc": doc_k, "expected_page": page,
-            "top1": top3[0].page if top3 else None,
-            "top1_doc": top3[0].doc_name if top3 else None,
-            "top3_pages": [h.page for h in top3],
-            "correct": bool(correct), "source_support": bool(support),
-            "latency_ms": round(dt * 1000, 1),
-        })
-    correct_n = sum(1 for r in rows if r["correct"])
-    # unanswerable handled separately (question index 8)
-    un_ok = rows[8]  # should NOT find a high-confidence match
-    res = {
-        "config": cfg_name, "ingest_s": round(ingest_s, 2),
-        "retrieval_correct_top3": f"{correct_n}/{len(QUESTIONS)}",
-        "mean_latency_ms": round(sum(r['latency_ms'] for r in rows) / len(rows), 1),
-        "unanswerable_top1_page": rows[8]["top1"],  # report; no strong match expected
-        "rows": rows,
+    for qid, (q, qtype, doc, page) in enumerate(QUESTIONS, 1):
+        # alternate arm order per question so neither arm always runs first
+        order = ARMS if qid % 2 else tuple(reversed(ARMS))
+        for arm in order:
+            row = run_question(app, reranker, arm, qid, q, qtype, doc, page)
+            rows.append(row)
+            print(f"[{arm:10s}] Q{qid:<2d} {row['latency_s']:6.2f}s "
+                  f"retrieved={row.get('target_retrieved')} cited={row.get('target_cited')} "
+                  f"excerpts_ok={row.get('all_excerpts_found')} err={row['error']}")
+    rows.sort(key=lambda r: (r["qid"], r["arm"]))
+
+    meta = {
+        "mode": settings.build_mode,
+        "valid_result": settings.build_mode == "full",
+        "decks": [d.name for d in decks],
+        "ingest_s": round(ingest_s, 1),
+        "models": settings.service_env,
+        "k_text": 5, "k_visual": 3, "candidate_pool_per_retriever": app.catalog._pool_size(5),
+        "run_at": time.strftime("%Y-%m-%d %H:%M:%S %Z"),
     }
-    shutil.rmtree(td, ignore_errors=True)
-    return res
-
-
-def main():
-    decks = sorted(p.name for p in MATERIALS.glob("*.pptx"))
-    results = {}
-    for name, cfg in CONFIGS:
-        print(">>>", name)
-        results[name] = run_config(name, cfg, decks, None)
-        # mirror config id
-        results[name]["id"] = name
-    out = Path(BASE) / "results"
+    summary = summarise(rows)
+    out = Path(args.out)
     out.mkdir(exist_ok=True)
-    (out / "comparison.json").write_text(
-        json.dumps(results, indent=2, default=str))
-    # markdown table
-    md = ["| Config | Retrieval correct (top-3) | Mean latency | Unanswerable→top1 |"]
-    md.append("|---|---|---|---|")
-    for name, r in results.items():
-        md.append(f"| {name} | {r['retrieval_correct_top3']} | "
-                  f"{r['mean_latency_ms']} ms | slide {r['unanswerable_top1_page']} |")
-    print("\n".join(md))
-    print("saved results/comparison.json")
+    stem = "comparison" if meta["valid_result"] else "comparison_OFFLINE_not_a_result"
+    (out / f"{stem}.json").write_text(json.dumps(
+        {"meta": meta, "summary": summary, "rows": rows}, indent=2, default=str))
+    cols = ["arm", "qid", "type", "question", "expected", "answer", "cited", "excerpts",
+            "target_retrieved", "target_cited", "all_cited_in_evidence",
+            "all_excerpts_found", "latency_s", "retrieval_s", "error",
+            "correct", "sources_support"]
+    with open(out / f"{stem}.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
+        w.writeheader()
+        for r in rows:
+            w.writerow({**r, "cited": "; ".join(r.get("cited", [])),
+                        "excerpts": " | ".join(r.get("excerpts", [])),
+                        "correct": "", "sources_support": ""})
+
+    print(f"\ningest {meta['ingest_s']}s  mode={meta['mode']}")
+    print("| Metric | rerank on | rerank off |\n|---|---|---|")
+    for key in summary["rerank_on"]:
+        print(f"| {key} | {summary['rerank_on'][key]} | {summary['rerank_off'][key]} |")
+    print(f"saved {out / stem}.json and .csv (fill in `correct` and `sources_support`)")
 
 
 if __name__ == "__main__":
