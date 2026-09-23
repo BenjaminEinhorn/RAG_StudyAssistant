@@ -220,3 +220,117 @@ class Assistant:
             evidence=evidence,
             citations=citations,
         )
+
+
+# ---------------------------------------------------------------------------
+# Topic-grounding helpers (pure, unit-testable)
+# ---------------------------------------------------------------------------
+_TOPIC_STOPWORDS = frozenset({
+    "the", "a", "an", "and", "of", "or", "for", "to", "in", "on", "at",
+    "by", "is", "are", "was", "were", "be", "it", "its", "as", "with",
+    "from", "into", "this", "that", "these", "those", "you", "your",
+    "we", "our", "i", "what", "how", "why", "should", "about",
+})
+
+
+def _singular(word: str) -> str:
+    """Treat plurals as equal by stripping a trailing 's'. No other stemming
+    ('retrieved' stays 'retrieved', so it never matches 'retrieval')."""
+    if word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _topic_tokens(topic: str) -> list[str]:
+    """Lowercase; split on spaces and hyphens; drop stopwords and words under
+    three characters; singularize plurals. No other stemming."""
+    out = []
+    for t in re.findall(r"[a-z0-9]+", topic.lower()):
+        if len(t) < 3 or t in _TOPIC_STOPWORDS:
+            continue
+        out.append(_singular(t))
+    return out
+
+
+def _text_token_set(text: str) -> set[str]:
+    return {_singular(t) for t in re.findall(r"[a-z0-9]+", text.lower())}
+
+
+def _is_short_acronym(topic: str) -> bool:
+    letters = re.sub(r"[^a-z0-9]", "", topic.lower())
+    return 2 <= len(letters) <= 4
+
+
+def _grounded_in(topic: str, text: str) -> bool:
+    """Whether ``text`` verifiably covers ``topic``: contains the full topic
+    phrase, or at least half (rounded up) of the topic tokens, or a short
+    acronym (e.g. RAG) as a whole word."""
+    topic = topic.strip()
+    if not topic:
+        return False
+    low = text.lower()
+    # full topic phrase present verbatim (only meaningful for multi-word topics)
+    if (" " in topic or "-" in topic) and topic.lower() in low:
+        return True
+    tokens = _topic_tokens(topic)
+    if tokens:
+        chunk_tokens = _text_token_set(text)
+        present = sum(1 for t in tokens if t in chunk_tokens)
+        if present >= (len(tokens) + 1) // 2:      # ceil(n/2)
+            return True
+    # short acronym present as a whole word (e.g. RAG, not 'storage' -> 'rag')
+    if _is_short_acronym(topic):
+        letters = re.sub(r"[^a-z0-9]", "", topic.lower())
+        if re.search(rf"(?<![a-z0-9]){re.escape(letters)}(?![a-z0-9])", low):
+            return True
+    return False
+
+
+def material_covers(catalog: "Catalog", chat: "ChatProvider", query: str,
+                    doc_names: list[str] | None = None,
+                    k: int = 5) -> bool:
+    """Whether the selected material actually covers ``query``.
+
+    Shares the Ask path's retrieval and the same model ``found`` contract (via
+    :data:`ANSWER_SCHEMA` and :func:`_assistant_system`), but does NOT trust
+    the model's bare boolean: the topic is covered only when the model sets
+    ``found`` true AND supports it with at least one citation that is verified
+    in code (verbatim excerpt present in an actually-retrieved chunk) whose
+    cited chunk text is :func:`_grounded_in` the topic. This refuses
+    semantically-adjacent-but-off-topic material (e.g. "retrieved context"
+    slides) that would otherwise look like RAG coverage.
+    """
+    chunks = catalog.search(query, k=k, doc_names=doc_names)
+    if not chunks:
+        return False
+    context_block = "\n\n".join(
+        f"[{i}] ({c.doc_name}, slide/page {c.page})\n{c.text}"
+        for i, c in enumerate(chunks, 1))
+    prompt = (
+        "Course material evidence (retrieved by search):\n\n" + context_block
+        + "\n\nTopic: " + query
+        + "\n\nDoes the material above actually cover this topic well enough "
+        "to write quiz questions about it? Set found=true only if some "
+        "evidence explicitly discusses the topic; when you do, cite that "
+        "evidence (source number + a short VERBATIM excerpt) so coverage can "
+        "be verified. Otherwise set found=false with citations=[]. Do NOT set "
+        "found=true for vaguely related material, and do NOT rely on your own "
+        "knowledge instead of the material.")
+    data = chat.complete_json(_assistant_system(), prompt, ANSWER_SCHEMA)
+    if not bool(data.get("found", False)):
+        return False
+    # require a code-verified citation whose cited chunk is grounded in topic
+    for cit in data.get("citations") or []:
+        try:
+            n = int(cit.get("source"))
+        except (TypeError, ValueError):
+            continue
+        if not 1 <= n <= len(chunks):
+            continue
+        chunk = chunks[n - 1]
+        excerpt = str(cit.get("excerpt") or "")
+        if not excerpt_in_text(excerpt, chunk.text):
+            continue
+        if _grounded_in(query, chunk.text):
+            return True
+    return False

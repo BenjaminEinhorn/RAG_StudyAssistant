@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 from ..config.settings import Settings
 from ..services.chat import ChatProvider
-from .assistant import excerpt_in_text
+from .assistant import excerpt_in_text, material_covers
 from .index import Catalog, RetrievedChunk
 
 
@@ -202,6 +202,12 @@ def generate_quiz(catalog: Catalog, chat: ChatProvider,
     if not chunks:
         raise ValueError("No course material matched this topic. Try a broader "
                          "topic or select a different document.")
+    # Reuse the Ask path's relevance check: only generate a quiz when the
+    # selected material actually covers the topic. Skipped for an empty topic
+    # (behavior unchanged from before).
+    if topic.strip() and not material_covers(catalog, chat, topic, doc_names,
+                                             k=context_k):
+        raise ValueError(f'No material on "{topic}" in the selected documents.')
     if isinstance(chat, LocalEchoChat):
         return _offline_quiz(chunks, num_questions)
     context_block = "\n\n".join(
