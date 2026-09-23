@@ -41,24 +41,30 @@ BRAND_CSS = """
 
 
 def refresh_docs(app: AppState):
-    return (gr.update(choices=app.doc_choices()),
+    return (gr.update(value=list_docs_df(app)),
+            gr.update(choices=app.doc_choices()),
+            gr.update(choices=app.doc_choices()),
             gr.update(choices=app.doc_choices()))
 
 
 def add_file_handler(app: AppState, filepath: str, files: list):
     if not filepath:
-        return "No file selected.", gr.update(), gr.update()
+        return "No file selected.", *[gr.update() for _ in range(4)]
     # copy into the app's materials dir (source of truth for indexing)
     src = Path(filepath)
     dest = app.settings.materials_dir / src.name
-    dest.write_bytes(src.read_bytes())
-    res = app.catalog.add_file(str(dest))
+    try:
+        dest.write_bytes(src.read_bytes())
+        res = app.catalog.add_file(str(dest))
+    except Exception as e:  # surface failures (e.g. LibreOffice) in the UI
+        return (f"⚠️ Could not add '{src.name}': {redact(str(e))}",
+                *[gr.update() for _ in range(4)])
     return (res["message"], *refresh_docs(app))
 
 
 def remove_handler(app: AppState, doc_name: str):
     if not doc_name:
-        return "Select a document to remove.", gr.update(), gr.update()
+        return "Select a document to remove.", *[gr.update() for _ in range(4)]
     res = app.catalog.remove_document(doc_name)
     return (res["message"], *refresh_docs(app))
 
@@ -232,7 +238,6 @@ def build_ui(app: AppState) -> gr.Blocks:
         with gr.Tab("Documents"):
             file_up = gr.File(label="Add course material (pdf, pptx, docx, txt, md)",
                               type="filepath")
-            add_btn = gr.Button("Add file", variant="primary")
             add_msg = gr.Markdown("")
             doc_table = gr.Dataframe(
                 headers=["Document", "Text chunks", "Slides/pages"],
@@ -243,16 +248,14 @@ def build_ui(app: AppState) -> gr.Blocks:
             remove_msg = gr.Markdown("")
             refresh_btn = gr.Button("Refresh")
 
-            add_btn.click(lambda f: add_file_handler(app, f, []),
-                          inputs=file_up, outputs=[add_msg, ask_docs, q_docs])
             file_up.change(lambda f: add_file_handler(app, f, []),
-                           inputs=file_up, outputs=[add_msg, ask_docs, q_docs])
+                           inputs=file_up, outputs=[add_msg, doc_table, remove_dd,
+                                                    ask_docs, q_docs])
             remove_btn.click(lambda d: remove_handler(app, d),
                              inputs=remove_dd,
-                             outputs=[remove_msg, ask_docs, q_docs])
-            refresh_btn.click(lambda: (list_docs_df(app), gr.update(choices=app.doc_choices()),
-                                       gr.update(choices=app.doc_choices())),
-                              inputs=[], outputs=[doc_table, ask_docs, q_docs])
+                             outputs=[remove_msg, doc_table, remove_dd, ask_docs, q_docs])
+            refresh_btn.click(lambda: refresh_docs(app),
+                              inputs=[], outputs=[doc_table, remove_dd, ask_docs, q_docs])
     return demo
 
 
