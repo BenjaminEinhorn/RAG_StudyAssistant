@@ -75,6 +75,9 @@ def add_file_handler(app: AppState, filepaths, files: list):
             messages.append(app.catalog.add_file(str(dest))["message"])
         except Exception as e:  # surface failures (e.g. LibreOffice) in the UI
             messages.append(f"⚠️ Could not add '{src.name}': {redact(str(e))}")
+    topic_error = app.sync_topics()   # one LLM call per newly added document
+    if topic_error:
+        messages.append(f"⚠️ Could not list quiz topics: {topic_error}")
     return ("  \n".join(messages), *refresh_docs(app))
 
 
@@ -86,6 +89,7 @@ def remove_handler(app: AppState, doc_names):
     if not doc_names:
         return "Select at least one document to remove.", *[gr.update() for _ in range(4)]
     messages = [app.catalog.remove_document(name)["message"] for name in doc_names]
+    app.sync_topics()
     return ("  \n".join(messages), *refresh_docs(app, clear_picks=True))
 
 
@@ -165,6 +169,15 @@ def quiz_feedback(quiz: Quiz, answers: dict[int, int], reveal_all: bool = False)
     return "\n\n".join(lines)
 
 
+def topic_dropdown_update(app: AppState, doc_names: list[str] | None,
+                          current: str | None = None):
+    """New quiz-topic choices for the selected documents, keeping the current
+    pick only if it is still offered."""
+    choices = app.topic_choices(doc_names or None)
+    value = current if current in choices else (choices[0] if choices else None)
+    return gr.update(choices=choices, value=value)
+
+
 def q_inputs():
     return [gr.State(), *[gr.Radio(choices=[], label=f"Q{i+1}", visible=False)
                            for i in range(MAX_QUESTIONS)]]
@@ -197,11 +210,13 @@ def build_ui(app: AppState) -> gr.Blocks:
                 outputs=[ask_answer, ask_gallery], api_name="ask")
 
         # ---------------- QUIZ ----------------
-        with gr.Tab("Quiz"):
+        with gr.Tab("Quiz") as quiz_tab:
             q_docs = gr.CheckboxGroup(label="Course material", choices=app.doc_choices())
             with gr.Row():
-                q_topic = gr.Textbox(label="Topic", value="Retrieval-Augmented Generation",
-                                     placeholder="Any topic from the material")
+                topics = app.topic_choices()
+                q_topic = gr.Dropdown(
+                    label="Topic", choices=topics, value=topics[0] if topics else None,
+                    info="General topics found in the selected material")
                 q_num = gr.Slider(3, MAX_QUESTIONS, value=5, step=1,
                                   label="Number of questions")
             q_gen = gr.Button("Generate quiz", variant="primary")
@@ -215,6 +230,9 @@ def build_ui(app: AppState) -> gr.Blocks:
                 qrows.append(radio)
 
             def gen(app, topic, num, docs):
+                if not topic:
+                    return ("Add course material first, then pick a topic.", "",
+                            *[gr.update() for _ in range(MAX_QUESTIONS)])
                 try:
                     quiz = generate_quiz(app.catalog, app.assistant.chat,
                                          topic, doc_names=docs or None,
@@ -252,6 +270,11 @@ def build_ui(app: AppState) -> gr.Blocks:
             q_gen.click(lambda t, n, d: gen(app, t, n, d),
                         inputs=[q_topic, q_num, q_docs],
                         outputs=[q_status, q_result, *qrows])
+            # topics follow the selected decks, and pick up newly added ones
+            q_docs.change(lambda d, t: topic_dropdown_update(app, d, t),
+                          inputs=[q_docs, q_topic], outputs=q_topic)
+            quiz_tab.select(lambda d, t: topic_dropdown_update(app, d, t),
+                            inputs=[q_docs, q_topic], outputs=q_topic)
             with gr.Row():
                 q_grade = gr.Button("Grade my answers", variant="secondary")
                 q_reveal = gr.Button("Show answers")

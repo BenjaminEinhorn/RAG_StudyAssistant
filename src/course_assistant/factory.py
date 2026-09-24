@@ -9,6 +9,7 @@ from .config.settings import Settings
 from .core.assistant import Assistant
 from .core.index import Catalog
 from .core.quiz import Quiz
+from .core.topics import TopicStore
 from .services.chat import build_chat
 from .services.embeddings import build_text_embedder, build_visual_embedder
 from .services.reranker import build_reranker
@@ -23,9 +24,26 @@ class AppState:
         self.assistant = assistant
         self.settings = settings
         self.quiz: Quiz | None = None
+        self.topics = TopicStore(settings)
 
     def doc_choices(self) -> list[str]:
         return [d["doc_name"] for d in self.catalog.list_documents()]
+
+    def sync_topics(self) -> str | None:
+        """Bring the topic cache in line with the loaded documents. Returns an
+        error message instead of raising, so a service outage never blocks
+        adding, removing or quizzing."""
+        try:
+            self.topics.ensure(self.catalog, self.assistant.chat)
+        except Exception as e:  # noqa: BLE001 — shown in the UI, key redacted
+            from .config.settings import redact
+            return redact(str(e))
+        return None
+
+    def topic_choices(self, doc_names: list[str] | None = None) -> list[str]:
+        """Quiz topics for the selected documents (all loaded when none)."""
+        self.sync_topics()
+        return self.topics.topics_for(doc_names)
 
 
 def build_app_state(settings: Settings,
