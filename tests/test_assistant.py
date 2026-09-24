@@ -111,3 +111,59 @@ def test_excerpt_matching_ignores_case_whitespace_and_quotes():
     assert not excerpt_in_text("", "anything")
     assert not excerpt_in_text("not there", "something else")
 
+
+# ------------------------------------------- answers that go beyond the slides
+
+def test_full_coverage_is_not_flagged(app_state, small_doc):
+    app_state.catalog.add_file(str(small_doc))
+    res = _assistant_with(app_state, {
+        "found": True, "answer": "Hybrid RAG combines two searches.",
+        "coverage": "full", "beyond_slides": "",
+        "citations": [{"source": 1, "excerpt": "keyword search and vector search"}],
+    }).answer("What is hybrid RAG?")
+    assert not res.outside_slides and res.beyond_slides == ""
+
+
+def test_partial_coverage_says_what_is_outside_the_slides(app_state, small_doc):
+    app_state.catalog.add_file(str(small_doc))
+    res = _assistant_with(app_state, {
+        "found": True, "answer": "Hybrid RAG combines two searches.",
+        "coverage": "partial",
+        "beyond_slides": "The slides do not say which vector database to use.",
+        "citations": [{"source": 1, "excerpt": "keyword search and vector search"}],
+    }).answer("What is hybrid RAG and which vector database should I use?")
+    assert res.outside_slides and res.coverage == "partial"
+    assert "vector database" in res.beyond_slides
+    assert res.found_evidence  # the covered part is still answered
+
+
+def test_unverified_full_answer_is_flagged_as_outside(app_state, small_doc):
+    app_state.catalog.add_file(str(small_doc))
+    res = _assistant_with(app_state, {
+        "found": True, "answer": "RAG was invented in 1850.", "coverage": "full",
+        "beyond_slides": "",
+        "citations": [{"source": 1, "excerpt": "RAG was invented in 1850"}],
+    }).answer("When was RAG invented?")
+    assert res.outside_slides and "outside the slides" in res.beyond_slides
+
+
+def test_not_found_is_marked_as_not_covered(app_state, small_doc):
+    app_state.catalog.add_file(str(small_doc))
+    res = _assistant_with(app_state, {
+        "found": False, "answer": "", "coverage": "full", "beyond_slides": "",
+        "citations": [],
+    }).answer("Who won the 2024 Super Bowl?")
+    assert res.coverage == "none" and res.beyond_slides
+
+
+def test_ui_shows_outside_slides_notice(app_state, small_doc, monkeypatch):
+    import pytest
+
+    pytest.importorskip("gradio")
+    from course_assistant.ui.app import ask_handler
+
+    monkeypatch.setattr(app_state.assistant, "answer", lambda *a, **k: AnswerResult(
+        answer="Partly answered.", coverage="partial",
+        beyond_slides="The slides do not name a vector database."))
+    md, _ = ask_handler(app_state, "q", [], True)
+    assert "Partly outside the slides" in md and "vector database" in md

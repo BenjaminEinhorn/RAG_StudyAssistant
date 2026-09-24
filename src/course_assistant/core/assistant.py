@@ -4,6 +4,7 @@ Returns structured data with separate ``answer`` and ``sources`` fields.
 The model must reply with schema-constrained JSON::
 
     {"found": bool, "answer": str,
+     "coverage": "full" | "partial" | "none", "beyond_slides": str,
      "citations": [{"source": <evidence number>, "excerpt": <verbatim quote>}]}
 
 and every citation is then checked in code, never trusted:
@@ -15,7 +16,10 @@ and every citation is then checked in code, never trusted:
   shown that slide's image.
 
 When nothing relevant is found the assistant says so explicitly instead of
-inventing an answer or citation.
+inventing an answer or citation. When a full answer would need knowledge from
+outside the slides, the result says so (``outside_slides``) and names what the
+slides do not cover; the code also raises that flag when the model claims an
+answer but none of its citations checks out.
 """
 from __future__ import annotations
 
@@ -30,12 +34,17 @@ _NO_EVIDENCE = "<<no-evidence>>"
 NOT_FOUND = ("I couldn't find enough supporting material in the loaded "
              "documents to answer this.")
 MAX_IMAGES = 4
+COVERAGE = ("full", "partial", "none")
 
 ANSWER_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["found", "answer", "citations"],
+    # coverage is decided first (JSON is generated in property order), so a
+    # partly covered question is answered for its covered part, not refused
+    "required": ["coverage", "beyond_slides", "found", "answer", "citations"],
     "properties": {
+        "coverage": {"type": "string", "enum": list(COVERAGE)},
+        "beyond_slides": {"type": "string"},
         "found": {"type": "boolean"},
         "answer": {"type": "string"},
         "citations": {
@@ -89,6 +98,13 @@ class AnswerResult:
     found_evidence: bool = True
     evidence: list[Source] = field(default_factory=list)     # everything retrieved
     citations: list[Citation] = field(default_factory=list)  # as the model cited
+    coverage: str = "full"        # how much of the question the slides cover
+    beyond_slides: str = ""       # what a full answer needs from outside them
+
+    @property
+    def outside_slides(self) -> bool:
+        """True when answering fully would require going outside the slides."""
+        return self.coverage != "full"
 
     @property
     def verified(self) -> bool:
@@ -121,12 +137,20 @@ def _assistant_system() -> str:
         "shows rather than its text.\n"
         "2. In the answer, mention document name and slide number for the "
         "evidence you use.\n"
-        "3. If the evidence and images do NOT contain enough information, or "
-        "the question is off-topic for the loaded materials, set found=false, "
+        "3. If the evidence answers only part of the question, set found=true, "
+        "answer just that part, and set coverage='partial'. If the evidence and "
+        "images answer NONE of it, or the question is off-topic for the loaded "
+        "materials, set found=false, "
         "citations=[], and answer: '" + NOT_FOUND + "' Do NOT invent answers, "
         "facts, or citations.\n"
         "4. When the question is about a picture/diagram/chart/meme on a "
         "slide, describe what the shown image contains and explain it.\n"
+        "5. Set coverage: 'full' if the evidence fully answers the question; "
+        "'partial' if it answers only part and a complete answer would need "
+        "knowledge from outside the slides; 'none' if the slides do not answer "
+        "it at all. For 'partial' or 'none', set beyond_slides to one sentence "
+        "naming what the slides do not cover; otherwise leave it empty. Never "
+        "fill the gap with outside knowledge in the answer.\n"
         "Answer in plain, concise prose.\n"
     )
 
@@ -185,8 +209,8 @@ class Assistant:
                 + ("\n\nAttached slide images:\n" + image_block if image_block else "")
                 + "\n\nStudent question: " + query
                 + "\n\nAnswer using ONLY this evidence. Cite evidence numbers with "
-                "verbatim excerpts. If it does not contain the answer, set "
-                "found=false.")
+                "verbatim excerpts. Answer whatever part it covers; set "
+                "found=false only if it covers none of the question.")
         data = self.chat.complete_json(
             _assistant_system(), prompt, ANSWER_SCHEMA,
             images=used_images if include_images else None)
@@ -205,13 +229,26 @@ class Assistant:
                 number=n, excerpt=excerpt, source=src, in_evidence=src is not None,
                 excerpt_found=bool(src) and excerpt_in_text(excerpt, src.text),
                 image_shown=bool(src and src.image_path in used_images)))
+        beyond = str(data.get("beyond_slides") or "").strip()
+        coverage = data.get("coverage")
+        if coverage not in COVERAGE:
+            coverage = "full" if model_found else "none"
         if not model_found:
             citations = []
             answer_text = answer_text or NOT_FOUND
+            coverage = "none"
         sources: list[Source] = []
         for c in citations:
             if c.supported and c.source not in sources:
                 sources.append(c.source)
+        if model_found and not sources and coverage == "full":
+            # the model claims a full answer, but nothing it cited checks out
+            coverage = "partial"
+            beyond = beyond or ("None of the cited slide text could be verified, "
+                                "so this answer may rely on knowledge from "
+                                "outside the slides.")
+        if coverage == "none" and not beyond:
+            beyond = "The loaded slides do not cover this question."
         return AnswerResult(
             answer=answer_text,
             sources=sources,
@@ -219,4 +256,6 @@ class Assistant:
             found_evidence=found and model_found,
             evidence=evidence,
             citations=citations,
+            coverage=coverage,
+            beyond_slides=beyond if coverage != "full" else "",
         )
