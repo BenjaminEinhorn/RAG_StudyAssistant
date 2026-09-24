@@ -30,6 +30,12 @@ REAL_DECK_W5 = REAL_DECKS_DIR / "MBAX 6418 - Week 5 - Context Engineering and RA
 
 # Tests needing the bundled course decks skip on a fresh clone unless the decks
 # were placed in {repo}/data/materials (see README "Sample data").
+# Slide images come from LibreOffice (PPTX -> PDF); without it decks parse as
+# text only, so tests that need slide images skip instead of failing.
+needs_soffice = pytest.mark.skipif(
+    shutil.which("soffice") is None,
+    reason="LibreOffice (soffice) not installed; slide images cannot be rendered")
+
 needs_decks = pytest.mark.skipif(
     not (REAL_DECK_W2.exists() and REAL_DECK_W5.exists()),
     reason="course decks not present in data/materials; place them to run deck tests")

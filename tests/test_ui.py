@@ -17,8 +17,8 @@ from course_assistant.ui.app import (
     remove_handler,
 )
 
-REMOVE_LABEL = "Remove a document"
-FILE_LABEL = "Add course material (pdf, pptx, docx, txt, md)"
+REMOVE_LABEL = "Remove documents"
+FILE_LABEL = "Add course material (pdf, pptx, docx, txt, md) — drop one or more files"
 
 
 def _names(rows):
@@ -69,10 +69,50 @@ def test_add_file_handler_surfaces_failure(app_state, small_doc, monkeypatch):
     assert "libreoffice conversion failed" in out[0]
 
 
-def test_add_file_handler_no_selection(app_state):
-    out = add_file_handler(app_state, "", [])
-    assert out[0] == "No file selected."
+def test_add_file_handler_adds_multiple_files(app_state, small_doc):
+    second = small_doc.parent / "more_notes.txt"
+    second.write_text("Chunking splits documents into pieces before indexing.")
+    out = add_file_handler(app_state, [str(small_doc), str(second)], [])
     assert len(out) == 5
+    lines = out[0].split("  \n")
+    assert len(lines) == 2  # one status line per file
+    for name in ("notes.txt", "more_notes.txt"):
+        assert name in _names(out[1]["value"])
+        assert name in out[2]["choices"]
+
+
+def test_add_file_handler_one_failure_does_not_block_others(app_state, small_doc,
+                                                            monkeypatch):
+    bad = small_doc.parent / "broken.pptx"
+    bad.write_bytes(b"not a real deck")
+    real_add = app_state.catalog.add_file
+
+    def add_or_fail(path, *args, **kwargs):
+        if path.endswith("broken.pptx"):
+            raise RuntimeError("libreoffice conversion failed")
+        return real_add(path, *args, **kwargs)
+
+    monkeypatch.setattr(app_state.catalog, "add_file", add_or_fail)
+    out = add_file_handler(app_state, [str(bad), str(small_doc)], [])
+    first_line, second_line = out[0].split("  \n")
+    assert first_line.startswith("⚠️ Could not add 'broken.pptx'")
+    assert "already loaded" not in second_line.lower()
+    assert "notes.txt" in _names(out[1]["value"])  # the good file still went in
+
+
+def test_file_upload_accepts_multiple_files(app_state):
+    demo = build_ui(app_state)
+    file_ups = [b for b in demo.blocks.values()
+                if getattr(b, "label", None) == FILE_LABEL]
+    assert len(file_ups) == 1
+    assert file_ups[0].file_count == "multiple"
+
+
+def test_add_file_handler_no_selection(app_state):
+    for empty in ("", None, []):
+        out = add_file_handler(app_state, empty, [])
+        assert out[0] == "No file selected."
+        assert len(out) == 5
 
 
 def test_remove_handler_updates_table_and_choices(app_state, small_doc):
@@ -87,8 +127,10 @@ def test_remove_handler_updates_table_and_choices(app_state, small_doc):
 
 def test_remove_handler_no_selection(app_state):
     out = remove_handler(app_state, "")
-    assert out[0] == "Select a document to remove."
-    assert len(out) == 5
+    for empty in ("", None, []):
+        out = remove_handler(app_state, empty)
+        assert out[0] == "Select at least one document to remove."
+        assert len(out) == 5
 
 
 # ------------------------------------------------------------- event wiring
@@ -146,3 +188,47 @@ def test_event_wiring_drop_ingests_once_and_no_button_ingests(app_state):
     assert len(doc_click_deps) == 2  # remove_btn + refresh_btn
     for d in doc_click_deps:
         assert add_msg_id not in d.get("outputs", [])
+
+
+# ------------------------------------------------ removing several documents
+
+def _three_docs(app_state, tmp_path):
+    names = []
+    for n in ("a.txt", "b.txt", "c.txt"):
+        p = tmp_path / n
+        p.write_text(f"Document {n} talks about topic {n[0]} in detail.")
+        app_state.catalog.add_file(str(p))
+        names.append(n)
+    return names
+
+
+def test_remove_handler_removes_several_at_once(app_state, tmp_path):
+    a, b, c = _three_docs(app_state, tmp_path)
+    out = remove_handler(app_state, [a, b])
+    assert len(out[0].split("  \n")) == 2
+    assert app_state.doc_choices() == [c]
+    assert _names(out[1]["value"]) == [c]
+    assert out[2]["choices"] == [c]
+
+
+def test_remove_clears_selections_so_the_next_event_does_not_crash(app_state, tmp_path):
+    """The crash: after a removal the remove dropdown (and the Ask/Quiz deck
+    pickers) kept the removed name selected, and Gradio rejected the next
+    click because that value was no longer among the choices."""
+    a, b, _ = _three_docs(app_state, tmp_path)
+    _, _, remove_dd, ask_docs, q_docs = remove_handler(app_state, [a])
+    for upd in (remove_dd, ask_docs, q_docs):
+        assert upd["value"] == []
+        assert a not in upd["choices"]
+
+
+def test_add_keeps_ask_and_quiz_selections(app_state, small_doc):
+    _, _, remove_dd, ask_docs, q_docs = add_file_handler(app_state, str(small_doc), [])
+    assert remove_dd["value"] == []
+    assert "value" not in ask_docs and "value" not in q_docs
+
+
+def test_remove_dropdown_is_multiselect(app_state):
+    demo = build_ui(app_state)
+    dd = [b for b in demo.blocks.values() if getattr(b, "label", None) == REMOVE_LABEL]
+    assert len(dd) == 1 and dd[0].multiselect

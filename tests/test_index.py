@@ -70,3 +70,32 @@ def test_rerank_off_keeps_fused_order(app_state, small_doc):
     app_state.catalog.reranker = None
     hits = app_state.catalog.search("keyword search and vector search")
     assert hits and hits == sorted(hits, key=lambda h: h.score, reverse=True)
+
+
+def test_remove_deletes_stored_file_and_slide_images(app_state, tmp_path):
+    import fitz  # PyMuPDF: build a 2-page PDF so page images are rendered
+
+    pdf = app_state.settings.materials_dir / "deck.pdf"
+    doc = fitz.open()
+    for text in ("Page one about embeddings", "Page two about reranking"):
+        doc.new_page().insert_text((72, 72), text)
+    doc.save(pdf)
+    app_state.catalog.add_file(str(pdf))
+    img_dirs = [p for p in app_state.settings.images_dir.iterdir() if any(p.iterdir())]
+    assert img_dirs, "the PDF's pages should have been rendered"
+
+    app_state.catalog.remove_document("deck.pdf")
+    assert not pdf.exists()                      # re-seeding cannot bring it back
+    assert not any(p.exists() for p in img_dirs)  # slide images are gone too
+
+
+def test_add_reports_parser_warnings(app_state, tmp_path, monkeypatch):
+    monkeypatch.setattr("course_assistant.core.parsing.find_soffice", lambda: None)
+    from pptx import Presentation
+
+    prs = Presentation()
+    prs.slides.add_slide(prs.slide_layouts[1]).shapes.title.text = "Only slide"
+    deck = tmp_path / "deck.pptx"
+    prs.save(deck)
+    res = app_state.catalog.add_file(str(deck))
+    assert "LibreOffice is not installed" in res["message"]

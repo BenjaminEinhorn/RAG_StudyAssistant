@@ -5,14 +5,15 @@ import pytest
 
 pytest.importorskip("gradio")  # skip, not abort, on a bare clone without gradio
 
-from conftest import REAL_DECK_W2, needs_decks  # noqa: E402
+from conftest import needs_soffice, REAL_DECK_W2, needs_decks  # noqa: E402
 from course_assistant.ui.app import (add_file_handler, ask_handler,  # noqa: E402
                                      quiz_feedback, remove_handler)
 
 
 @needs_decks
+@needs_soffice
 def test_full_add_ask_dedup_remove_flow(app_state):
-    msg1, d1, d2 = add_file_handler(app_state, str(REAL_DECK_W2), [])
+    msg1, *_ = add_file_handler(app_state, str(REAL_DECK_W2), [])
     assert "Added" in msg1
     assert any("Week 2" in n for n in app_state.doc_choices())
 
@@ -25,18 +26,19 @@ def test_full_add_ask_dedup_remove_flow(app_state):
     assert gallery, "gallery should show a supporting slide image"
 
     # DEDUP: loading the same file twice must not duplicate
-    msg_dup, _, _ = add_file_handler(app_state, str(REAL_DECK_W2), [])
+    msg_dup, *_ = add_file_handler(app_state, str(REAL_DECK_W2), [])
     assert "already loaded" in msg_dup
     assert len(app_state.catalog.list_documents()) == 1
 
     # REMOVE: content must be unreachable afterwards
-    msg_rm, _, _ = remove_handler(app_state, REAL_DECK_W2.name)
+    msg_rm, *_ = remove_handler(app_state, REAL_DECK_W2.name)
     assert "Removed" in msg_rm
     assert app_state.catalog.list_documents() == []
     assert app_state.catalog.search("Vibe Coding") == []
 
 
 @needs_decks
+@needs_soffice
 def test_meme_slide_image_is_displayed(app_state):
     add_file_handler(app_state, str(REAL_DECK_W2), [])
     answer_md, gallery = ask_handler(
