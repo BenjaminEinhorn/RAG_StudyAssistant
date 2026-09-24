@@ -10,6 +10,12 @@ from course_assistant.ui.app import (add_file_handler, ask_handler,  # noqa: E40
                                      quiz_feedback, remove_handler)
 
 
+def _id_of(app_state, name):
+    """The removal UI selects documents by id (the checkbox list values)."""
+    return next(d["doc_id"] for d in app_state.catalog.list_documents()
+                if d["doc_name"] == name)
+
+
 @needs_decks
 @needs_soffice
 def test_full_add_ask_dedup_remove_flow(app_state):
@@ -31,7 +37,7 @@ def test_full_add_ask_dedup_remove_flow(app_state):
     assert len(app_state.catalog.list_documents()) == 1
 
     # REMOVE: content must be unreachable afterwards
-    msg_rm, *_ = remove_handler(app_state, REAL_DECK_W2.name)
+    msg_rm, *_ = remove_handler(app_state, [_id_of(app_state, REAL_DECK_W2.name)])
     assert "Removed" in msg_rm
     assert app_state.catalog.list_documents() == []
     assert app_state.catalog.search("Vibe Coding") == []
@@ -50,7 +56,7 @@ def test_meme_slide_image_is_displayed(app_state):
 def test_removed_doc_does_not_leak_into_answer(app_state, small_doc):
     from course_assistant.ui.app import add_file_handler, remove_handler
     add_file_handler(app_state, str(small_doc), [])
-    remove_handler(app_state, "notes.txt")
+    remove_handler(app_state, [_id_of(app_state, "notes.txt")])
     res = app_state.assistant.answer("hybrid RAG")
     # no sources from the removed doc
     assert not any(s.doc_name == "notes.txt" for s in res.sources)

@@ -160,10 +160,13 @@ cp .env.example .env                 # put the class key in COURSE_API_KEY (neve
   documents, answers and quiz topics; switching clears the previous answer
   and quiz.
 - **Documents** tab — drop one or more files to add them (one status line per
-  file). Re-adding the same file is detected by content hash and skipped. To
-  remove, pick one or more under **Remove documents** and click **Remove
-  selected**: this drops their chunks, vectors, slide images and stored copy,
-  so later answers can't use them. No retraining is involved.
+  file). Re-adding the same file is detected by content hash and skipped.
+  **Documents in this course** lists every document with a checkbox (slides
+  and chunk counts in the label). To remove, tick one or more and click
+  **Remove selected** (disabled until something is ticked): this drops their
+  chunks, text and image vectors, slide images and stored copy from the
+  current course only, so later answers can't use them. No retraining is
+  involved.
 - **Ask** tab — pick decks (or ask all), type a text or visual question (e.g.
   "what does the *Vibe Coding on Prod* meme mean?"), and **Ask**. The answer
   cites document + slide/page, lists source excerpts, and shows the relevant
