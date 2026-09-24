@@ -56,3 +56,59 @@ def test_switch_course_handler_updates_every_list(app_state, small_doc):
 
     bad = create_course_handler(app_state, "FIN 6100")
     assert bad[1].startswith("⚠️") and app_state.course_name == first
+
+
+# --------------------------------------------- acceptance: no cross-course leaks
+
+def _write(tmp_path, name, text):
+    p = tmp_path / name
+    p.write_text(text)
+    return str(p)
+
+
+def test_acceptance_courses_never_share_documents_or_retrieval(app_state, tmp_path):
+    """Course A gets A1/A2, course B gets B1/B2. Each course lists and
+    retrieves only its own documents, even when the other course's text is a
+    far better match for the query."""
+    pytest.importorskip("gradio")
+    from course_assistant.ui.app import add_file_handler, create_course_handler
+
+    a1 = _write(tmp_path, "A1.txt", "Bond duration measures interest rate risk.")
+    a2 = _write(tmp_path, "A2.txt", "Equity valuation uses discounted cash flows.")
+    b1 = _write(tmp_path, "B1.txt", "Monte Carlo simulation of bankruptcy risk "
+                                     "in leveraged buyouts, Monte Carlo bankruptcy.")
+    b2 = _write(tmp_path, "B2.txt", "Real options value managerial flexibility.")
+
+    create_course_handler(app_state, "Course A")
+    add_file_handler(app_state, [a1, a2], [])
+    create_course_handler(app_state, "Course B")
+    add_file_handler(app_state, [b1, b2], [])
+    assert app_state.doc_choices() == ["B1.txt", "B2.txt"]
+
+    out = create_course_handler(app_state, "Course A")  # already exists: refused
+    assert out[1].startswith("⚠️")
+    from course_assistant.ui.app import switch_course_handler
+    out = switch_course_handler(app_state, "Course A")
+    ask_docs, q_docs = out[5], out[6]
+    assert ask_docs["choices"] == ["A1.txt", "A2.txt"] == q_docs["choices"]
+    assert ask_docs["value"] == []                      # stale picks cleared
+
+    hits = app_state.catalog.search("Monte Carlo bankruptcy simulation", k=10)
+    assert hits and {h.doc_name for h in hits} <= {"A1.txt", "A2.txt"}
+    assert not list((app_state.settings.materials_dir).glob("B*.txt"))
+
+
+def test_upload_box_is_emptied_so_a_course_switch_cannot_resend_files(app_state,
+                                                                        tmp_path):
+    """The reported leak: the multi-file upload box kept every file dropped
+    into it and re-sent them all on the next drop, so after switching course
+    the previous course's files were added to the new one."""
+    pytest.importorskip("gradio")
+    from course_assistant.ui.app import build_ui
+
+    demo = build_ui(app_state)
+    upload = [f for f in demo.fns.values()
+              if any(ev == "upload" for _, ev in f.targets)]
+    assert len(upload) == 1
+    out = upload[0].fn([_write(tmp_path, "A1.txt", "Bond duration.")])
+    assert out[-1] is None                               # box emptied after ingest

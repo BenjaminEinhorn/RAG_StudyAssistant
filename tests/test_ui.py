@@ -141,7 +141,7 @@ def _comps(demo):
 
 
 def test_event_wiring_drop_ingests_once_and_no_button_ingests(app_state):
-    """Issue #12: file_up.change is the only ingestion path; add/remove/refresh
+    """Issue #12: file_up.upload is the only ingestion path; add/remove/refresh
     all keep the table and remove-dropdown in sync (issues #11/#15)."""
     demo = build_ui(app_state)
     comps = _comps(demo)
@@ -161,16 +161,17 @@ def test_event_wiring_drop_ingests_once_and_no_button_ingests(app_state):
         return [d for d in deps
                 if any(ev == event for _, ev in (d.get("targets") or []))]
 
-    # change events that touch the documents table (the quiz deck picker's
-    # change event only refreshes the topic dropdown)
-    change_deps = [d for d in targeted("change")
+    # events that touch the documents table besides buttons: only the upload
+    upload_deps = [d for d in targeted("upload") + targeted("change")
                    if doc_table_id in (d.get("outputs") or [])]
     click_deps = targeted("click")
 
-    # dropping a file is the ONLY ingestion path
-    assert len(change_deps) == 1
-    ingestion = change_deps[0]
-    assert (file_up_id, "change") in ingestion["targets"]
+    # dropping a file is the ONLY ingestion path, and it empties the upload box
+    # afterwards so the next drop does not re-send earlier files
+    assert len(upload_deps) == 1
+    ingestion = upload_deps[0]
+    assert ingestion["targets"] == [(file_up_id, "upload")]
+    assert file_up_id in ingestion["outputs"]
     # its status message is the markdown among its outputs
     add_msg_id = [o for o in ingestion["outputs"] if comps[o][0] == "markdown"]
     assert len(add_msg_id) == 1
@@ -181,11 +182,14 @@ def test_event_wiring_drop_ingests_once_and_no_button_ingests(app_state):
     assert remove_dd_id in ingestion["outputs"]
 
     # issue #12: no button click performs ingestion (drop fires once per file)
+    # (switching/creating a course only clears the message, it never ingests)
+    course_dd_id = find(lambda tv: tv[0] == "dropdown" and tv[1] == "Course")[0]
     for d in click_deps:
+        if course_dd_id in (d.get("outputs") or []):
+            continue
         assert add_msg_id not in (d.get("outputs") or [])
 
     # issues #11/#15: the remove/refresh buttons refresh table + dropdown
-    course_dd_id = find(lambda tv: tv[0] == "dropdown" and tv[1] == "Course")[0]
     doc_click_deps = [d for d in click_deps
                       if doc_table_id in d.get("outputs", [])
                       and remove_dd_id in d.get("outputs", [])

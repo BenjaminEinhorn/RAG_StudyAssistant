@@ -339,9 +339,13 @@ def build_ui(app: AppState) -> gr.Blocks:
             remove_msg = gr.Markdown("")
             refresh_btn = gr.Button("Refresh")
 
-            file_up.change(lambda f: add_file_handler(app, f, []),
+            # ingest on upload only, then empty the box: with file_count
+            # "multiple" the box accumulates files and each drop re-sends all
+            # of them, which after a course switch copied the previous
+            # course's files into the new course
+            file_up.upload(lambda f: (*add_file_handler(app, f, []), None),
                            inputs=file_up, outputs=[add_msg, doc_table, remove_dd,
-                                                    ask_docs, q_docs])
+                                                    ask_docs, q_docs, file_up])
             remove_btn.click(lambda d: remove_handler(app, d),
                              inputs=remove_dd,
                              outputs=[remove_msg, doc_table, remove_dd, ask_docs, q_docs])
@@ -353,10 +357,11 @@ def build_ui(app: AppState) -> gr.Blocks:
         # course's answer and quiz, so nothing from one class shows in another
         course_outputs = [course_dd, course_msg, hero, doc_table, remove_dd,
                           ask_docs, q_docs, q_topic]
-        cleared = [ask_answer, ask_gallery, q_status, q_result, *qrows]
+        cleared = [ask_answer, ask_gallery, q_status, q_result, file_up, add_msg,
+                   remove_msg, *qrows]
 
         def _cleared():
-            return ("", [], "", "",
+            return ("", [], "", "", None, "", "",
                     *[gr.update(visible=False, value=None) for _ in qrows])
 
         course_dd.input(lambda n: (*switch_course_handler(app, n), *_cleared()),
