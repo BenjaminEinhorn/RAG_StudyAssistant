@@ -105,6 +105,10 @@ def ask_handler(app: AppState, question: str, doc_selection: list, ask_images: b
     except Exception as e:  # service errors: show them, never the key
         return f"⚠️ Could not answer: {redact(str(e))}", []
     answer_md = f"**Answer**  \n{result.answer}\n\n"
+    if result.outside_slides:
+        label = ("Not covered by the slides" if result.coverage == "none"
+                 else "Partly outside the slides")
+        answer_md += f"> ⚠️ **{label}:** {result.beyond_slides}\n\n"
     src_md = "**Sources**  \n"
     if not result.found_evidence:
         src_md += "*(no supporting material found — nothing is cited)*"
