@@ -41,17 +41,26 @@ BRAND_CSS = """
 """
 
 
-def refresh_docs(app: AppState, clear_picks: bool = False):
-    """Updates for (doc_table, remove_dd, ask_docs, q_docs).
+def doc_list_choices(app: AppState) -> list[tuple[str, str]]:
+    """(label, doc_id) per document of the current course, for the checkbox
+    list that is the only way to select documents for removal."""
+    return [(f"{d['doc_name']}  ·  {d['slide_count']} slides/pages · "
+             f"{d['chunks']} text chunks", d["doc_id"])
+            for d in app.catalog.list_documents()]
 
-    The remove selection is always cleared, and the Ask/Quiz selections too
-    when documents went away (``clear_picks``): Gradio rejects the next event
-    if a component still holds a value that is no longer among its choices.
+
+def refresh_docs(app: AppState, clear_picks: bool = False):
+    """Updates for (doc_list, remove_btn, ask_docs, q_docs).
+
+    The removal selection is always cleared (and the Remove button disabled
+    until something is ticked), and the Ask/Quiz selections too when
+    documents went away (``clear_picks``): Gradio rejects the next event if a
+    component still holds a value that is no longer among its choices.
     """
     choices = app.doc_choices()
     picks = {"value": []} if clear_picks else {}
-    return (gr.update(value=list_docs_df(app)),
-            gr.update(choices=choices, value=[]),
+    return (gr.update(choices=doc_list_choices(app), value=[]),
+            gr.update(interactive=False),
             gr.update(choices=choices, **picks),
             gr.update(choices=choices, **picks))
 
@@ -82,14 +91,16 @@ def add_file_handler(app: AppState, filepaths, files: list):
     return ("  \n".join(messages), *refresh_docs(app))
 
 
-def remove_handler(app: AppState, doc_names):
-    """Remove one or more documents and all their searchable content."""
-    if isinstance(doc_names, str):
-        doc_names = [doc_names]
-    doc_names = [d for d in (doc_names or []) if d]
-    if not doc_names:
+def remove_handler(app: AppState, doc_ids):
+    """Remove the ticked documents (by id) from the current course, with all
+    their chunks, vectors, slide images and stored files. Ids that are not
+    documents of the current course are refused, never removed elsewhere."""
+    if isinstance(doc_ids, str):
+        doc_ids = [doc_ids]
+    doc_ids = [d for d in (doc_ids or []) if d]
+    if not doc_ids:
         return "Select at least one document to remove.", *[gr.update() for _ in range(4)]
-    messages = [app.catalog.remove_document(name)["message"] for name in doc_names]
+    messages = [app.catalog.remove_document_id(did)["message"] for did in doc_ids]
     app.sync_topics()
     return ("  \n".join(messages), *refresh_docs(app, clear_picks=True))
 
@@ -104,8 +115,8 @@ def hero_html(course_name: str) -> str:
 
 
 def switch_course_handler(app: AppState, name: str):
-    """Open another course. Returns (course_dd, course_msg, hero, doc_table,
-    remove_dd, ask_docs, q_docs, q_topic); the caller also clears the quiz."""
+    """Open another course. Returns (course_dd, course_msg, hero, doc_list,
+    remove_btn, ask_docs, q_docs, q_topic); the caller also clears the quiz."""
     if name and name != app.course_name:
         try:
             app.switch_course(name)
@@ -129,13 +140,6 @@ def create_course_handler(app: AppState, name: str):
     except ValueError as e:
         return (gr.update(), f"⚠️ {e}", *[gr.update() for _ in range(6)])
     return switch_course_handler(app, name)
-
-
-def list_docs_df(app: AppState) -> list:
-    docs = app.catalog.list_documents()
-    if not docs:
-        return [["(none loaded yet)", 0, 0]]
-    return [[d["doc_name"], d["chunks"], d["slide_count"]] for d in docs]
 
 
 def ask_handler(app: AppState, question: str, doc_selection: list, ask_images: bool):
@@ -329,33 +333,35 @@ def build_ui(app: AppState) -> gr.Blocks:
                                     "drop one or more files",
                               type="filepath", file_count="multiple")
             add_msg = gr.Markdown("")
-            doc_table = gr.Dataframe(
-                headers=["Document", "Text chunks", "Slides/pages"],
-                value=list_docs_df(app), interactive=False, wrap=True)
-            remove_dd = gr.Dropdown(choices=app.doc_choices(), value=[],
-                                    multiselect=True, label="Remove documents",
-                                    info="Pick one or more, then click Remove")
-            remove_btn = gr.Button("Remove selected", variant="stop")
+            doc_list = gr.CheckboxGroup(
+                label="Documents in this course", choices=doc_list_choices(app),
+                value=[], info="Tick the documents to remove")
+            with gr.Row():
+                remove_btn = gr.Button("Remove selected", variant="stop",
+                                       interactive=False)
+                refresh_btn = gr.Button("Refresh")
             remove_msg = gr.Markdown("")
-            refresh_btn = gr.Button("Refresh")
 
             # ingest on upload only, then empty the box: with file_count
             # "multiple" the box accumulates files and each drop re-sends all
             # of them, which after a course switch copied the previous
             # course's files into the new course
             file_up.upload(lambda f: (*add_file_handler(app, f, []), None),
-                           inputs=file_up, outputs=[add_msg, doc_table, remove_dd,
+                           inputs=file_up, outputs=[add_msg, doc_list, remove_btn,
                                                     ask_docs, q_docs, file_up])
-            remove_btn.click(lambda d: remove_handler(app, d),
-                             inputs=remove_dd,
-                             outputs=[remove_msg, doc_table, remove_dd, ask_docs, q_docs])
+            # the button only works while something is ticked
+            doc_list.change(lambda ids: gr.update(interactive=bool(ids)),
+                            inputs=doc_list, outputs=remove_btn)
+            remove_btn.click(lambda ids: remove_handler(app, ids),
+                             inputs=doc_list,
+                             outputs=[remove_msg, doc_list, remove_btn, ask_docs, q_docs])
             refresh_btn.click(lambda: refresh_docs(app),
-                              inputs=[], outputs=[doc_table, remove_dd, ask_docs, q_docs])
+                              inputs=[], outputs=[doc_list, remove_btn, ask_docs, q_docs])
 
         # ---------------- COURSES ----------------
         # switching course swaps every document list and clears the old
         # course's answer and quiz, so nothing from one class shows in another
-        course_outputs = [course_dd, course_msg, hero, doc_table, remove_dd,
+        course_outputs = [course_dd, course_msg, hero, doc_list, remove_btn,
                           ask_docs, q_docs, q_topic]
         cleared = [ask_answer, ask_gallery, q_status, q_result, file_up, add_msg,
                    remove_msg, *qrows]

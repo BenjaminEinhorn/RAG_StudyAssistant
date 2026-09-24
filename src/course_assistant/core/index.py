@@ -194,22 +194,35 @@ class Catalog:
                 "images": n_images}
 
     def remove_document(self, doc_name: str):
-        """Remove a document (by name) and ALL its indexed content, its
-        rendered slide images and the stored copy of the file, so re-seeding
-        from the materials folder cannot bring it back."""
+        """Remove a document by name (see :meth:`remove_document_id`)."""
         doc_ids = {c.doc_id for c in self._chunks.values() if c.doc_name == doc_name}
         if not doc_ids:
             return {"ok": False, "message": f"No document named '{doc_name}'."}
         for did in doc_ids:
-            self._text_col.delete(where={"doc_id": did})
-            self._visual_col.delete(where={"doc_id": did})
-            self._chunks = {cid: c for cid, c in self._chunks.items() if c.doc_id != did}
-            # images live in images/<first 12 hex of the file hash>/ (parsing.py)
-            shutil.rmtree(self.settings.images_dir / did[:12], ignore_errors=True)
-        (self.settings.materials_dir / doc_name).unlink(missing_ok=True)
+            self.remove_document_id(did)
+        return {"ok": True, "message": f"Removed '{doc_name}' and its searchable content."}
+
+    def remove_document_id(self, doc_id: str):
+        """Remove a document of THIS catalog (one course) by its id, with ALL
+        its indexed content (chunks, text and visual vectors), its rendered
+        slide images and the stored copy of the file, so re-seeding from the
+        materials folder cannot bring it back. Ids of other courses' documents
+        are not in this catalog and are refused."""
+        names = {c.doc_name for c in self._chunks.values() if c.doc_id == doc_id}
+        if not names:
+            return {"ok": False, "message": f"No document with id '{doc_id}' in this course."}
+        self._text_col.delete(where={"doc_id": doc_id})
+        self._visual_col.delete(where={"doc_id": doc_id})
+        self._chunks = {cid: c for cid, c in self._chunks.items() if c.doc_id != doc_id}
+        # images live in images/<first 12 hex of the file hash>/ (parsing.py)
+        shutil.rmtree(self.settings.images_dir / doc_id[:12], ignore_errors=True)
+        for name in names:
+            (self.settings.materials_dir / name).unlink(missing_ok=True)
         self._save_registry()
         self._build_bm25()
-        return {"ok": True, "message": f"Removed '{doc_name}' and its searchable content."}
+        name = sorted(names)[0]
+        return {"ok": True, "doc_name": name,
+                "message": f"Removed '{name}' and its searchable content."}
 
     # ------------------------------------------------------------ retrieval
     RRF_K = 60          # reciprocal-rank-fusion constant (Cormack et al.)

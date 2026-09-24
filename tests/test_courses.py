@@ -112,3 +112,41 @@ def test_upload_box_is_emptied_so_a_course_switch_cannot_resend_files(app_state,
     assert len(upload) == 1
     out = upload[0].fn([_write(tmp_path, "A1.txt", "Bond duration.")])
     assert out[-1] is None                               # box emptied after ingest
+
+
+def test_acceptance_remove_two_documents_from_one_course_only(app_state, tmp_path):
+    """Tick two documents in Finance -> Remove selected -> both leave Finance's
+    list, index and retrieval; the other course is untouched."""
+    pytest.importorskip("gradio")
+    from course_assistant.ui.app import add_file_handler, remove_handler
+
+    first = app_state.course_name
+    add_file_handler(app_state, [_write(tmp_path, "Week2.txt",
+                                        "Bankruptcy of a startup that shipped "
+                                        "vibe-coded software to prod.")], [])
+    app_state.create_course("Finance")
+    add_file_handler(app_state, [
+        _write(tmp_path, "Bankruptcy.txt", "Chapter 11 bankruptcy reorganises debt."),
+        _write(tmp_path, "MonteCarlo.txt", "Monte Carlo simulation samples outcomes."),
+        _write(tmp_path, "Valuations.txt", "Valuation by discounted cash flow."),
+    ], [])
+    ids = {d["doc_name"]: d["doc_id"] for d in app_state.catalog.list_documents()}
+
+    msg, doc_list, *_ = remove_handler(
+        app_state, [ids["Bankruptcy.txt"], ids["MonteCarlo.txt"]])
+    assert msg.count("Removed") == 2
+    assert [label.split("  ·  ")[0] for label, _ in doc_list["choices"]] == ["Valuations.txt"]
+    assert doc_list["value"] == []
+
+    # chunks, vectors and keyword index no longer hold them
+    cat = app_state.catalog
+    assert {c.doc_name for c in cat._chunks.values()} == {"Valuations.txt"}
+    for did in (ids["Bankruptcy.txt"], ids["MonteCarlo.txt"]):
+        assert cat._text_col.get(where={"doc_id": did})["ids"] == []
+    for q in ("Chapter 11 bankruptcy", "Monte Carlo simulation"):
+        assert {h.doc_name for h in cat.search(q, k=10)} <= {"Valuations.txt"}
+
+    # the other course still has its document, and still retrieves it
+    app_state.switch_course(first)
+    assert app_state.doc_choices() == ["Week2.txt"]
+    assert app_state.catalog.search("bankruptcy")[0].doc_name == "Week2.txt"
