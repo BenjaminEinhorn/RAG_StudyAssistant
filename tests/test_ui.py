@@ -185,9 +185,11 @@ def test_event_wiring_drop_ingests_once_and_no_button_ingests(app_state):
         assert add_msg_id not in (d.get("outputs") or [])
 
     # issues #11/#15: the remove/refresh buttons refresh table + dropdown
+    course_dd_id = find(lambda tv: tv[0] == "dropdown" and tv[1] == "Course")[0]
     doc_click_deps = [d for d in click_deps
                       if doc_table_id in d.get("outputs", [])
-                      and remove_dd_id in d.get("outputs", [])]
+                      and remove_dd_id in d.get("outputs", [])
+                      and course_dd_id not in d.get("outputs", [])]  # not "Create course"
     assert len(doc_click_deps) == 2  # remove_btn + refresh_btn
     for d in doc_click_deps:
         assert add_msg_id not in d.get("outputs", [])

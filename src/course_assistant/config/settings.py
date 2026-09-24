@@ -6,6 +6,7 @@ Secrets are read from environment variables (and optionally a local
 """
 from __future__ import annotations
 
+import copy
 import os
 from pathlib import Path
 
@@ -70,6 +71,11 @@ class Settings:
         self.chunk_overlap = int(_get("CHUNK_OVERLAP", "150"))
 
         base_dir = Path(os.environ.get("COURSE_DATA_DIR", "data")).resolve()
+        self.root_data_dir = base_dir                    # holds every course
+        self._set_data_dir(base_dir)
+        self.build_mode = os.environ.get("COURSE_BUILD_MODE", "local")
+
+    def _set_data_dir(self, base_dir: Path) -> None:
         self.data_dir = base_dir
         self.materials_dir = base_dir / "materials"      # original uploaded files
         self.images_dir = base_dir / "images"            # rendered page/slide images
@@ -79,7 +85,13 @@ class Settings:
         self.image_meta = base_dir / "images.jsonl"
         for d in (self.materials_dir, self.images_dir):
             d.mkdir(parents=True, exist_ok=True)
-        self.build_mode = os.environ.get("COURSE_BUILD_MODE", "local")
+
+    def for_data_dir(self, base_dir: Path) -> "Settings":
+        """A copy of these settings whose files live under ``base_dir``
+        (one course's materials, images, index and topics)."""
+        other = copy.copy(self)
+        other._set_data_dir(Path(base_dir).resolve())
+        return other
 
     @property
     def service_env(self) -> dict:
