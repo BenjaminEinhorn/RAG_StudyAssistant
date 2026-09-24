@@ -161,7 +161,10 @@ def test_event_wiring_drop_ingests_once_and_no_button_ingests(app_state):
         return [d for d in deps
                 if any(ev == event for _, ev in (d.get("targets") or []))]
 
-    change_deps = targeted("change")
+    # change events that touch the documents table (the quiz deck picker's
+    # change event only refreshes the topic dropdown)
+    change_deps = [d for d in targeted("change")
+                   if doc_table_id in (d.get("outputs") or [])]
     click_deps = targeted("click")
 
     # dropping a file is the ONLY ingestion path
