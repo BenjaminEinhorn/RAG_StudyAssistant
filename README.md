@@ -6,7 +6,8 @@ slide/image as visual evidence beside every answer. It answers only from the
 loaded material — when the documents don't contain the answer it says so rather
 than guessing — and keeps quiz answer keys hidden until you answer or request
 them. Built for MBAX 6418 (LLMs for Business, CU Boulder) using the class
-endpoints.
+endpoints, and usable for any class: each **course** is a separate workspace
+with its own documents, index and quiz topics.
 
 ## Screenshots
 
@@ -39,6 +40,9 @@ Uploads (`.pptx`, `.pdf`, `.docx`, `.txt`, `.md`) are parsed page/slide by page
 with PyMuPDF: text is extracted **and** every page/slide is rendered to a PNG.
 `.pptx` is first converted to PDF by headless **LibreOffice** (`soffice`); DOCX
 and TXT are read directly; anything else is rejected with a clear message.
+Without LibreOffice a `.pptx` is still added, but as **text only** (no slide
+images, so visual questions cannot show its slides) and the upload message says
+so.
 
 **Step 2 — Chunking** (`core/chunking.py`)
 Text is split with LangChain splitters (recursive by default, fixed-size as an
@@ -61,12 +65,21 @@ Keyword and text-vector candidates (20 from each) are merged by
 **reciprocal-rank fusion**, then **reranked** by the class multimodal reranker;
 slide images from the visual index are reranked the same way. The best evidence
 — including up to four slide *images* — goes to the class vision LLM, which must
-reply with schema-constrained JSON `{found, answer, citations: [{source,
-excerpt}]}`. Every citation is then checked in code: the cited number must be an
+reply with schema-constrained JSON `{coverage, beyond_slides, found, answer,
+citations: [{source, excerpt}]}`. `coverage` (`full` / `partial` / `none`) says
+whether the slides answer the whole question; for `partial` the model answers
+only the covered part and `beyond_slides` names what a full answer would need
+from outside the slides, shown as a notice under the answer. `coverage` comes
+first in the schema because the JSON is generated in order: with `found` first,
+the model refused mixed questions outright. Every citation is then checked in code: the cited number must be an
 item retrieval actually returned, and the quoted excerpt must occur in that
 chunk's text (or, with no quote, the model must have been shown that slide's
 image). Only verified citations are listed as `sources`; anything else is
-flagged in the UI. `core/quiz.py` builds MCQs from the same retrieval: each
+flagged in the UI, and a claimed full answer with no verified citation is
+downgraded to `partial`. Quiz topics (`core/topics.py`) are
+extracted once per document when it is added: the LLM reads each slide's first
+line (usually its title) and names 3–8 broad topics, cached in
+`topics.json`. `core/quiz.py` builds MCQs from the same retrieval: each
 question cites the excerpt it comes from, the key stays server-side until the
 student grades or asks for answers, and scoring is a pure function of that key.
 
@@ -103,18 +116,35 @@ blank answer.
 
 ## Data
 
-- `data/materials/` — course decks to ingest (not committed; add yours).
-- `data/images/` — rendered slide PNGs, one per page (gitignored).
-- `data/text_chunks.jsonl`, `data/chroma/` — chunk registry + vector stores.
+Everything under `data/` is gitignored.
+
+- `data/courses.json` — the list of courses. The first course (`MBAX 6418`, or
+  `COURSE_NAME`) uses `data/` itself; each new course gets
+  `data/courses/<name>/` with the same layout as below.
+- `materials/` — stored copies of the added files (removing a document deletes
+  its copy).
+- `images/` — rendered slide PNGs, one per page.
+- `text_chunks.jsonl`, `chroma/` — chunk registry + vector stores.
+- `topics.json` — cached quiz topics per document.
 - `results/comparison.{json,csv}` and `results/replicate/` — rerank on/off
   comparison (committed; CSV has the human-grading columns).
-- `seed_data.py` — ingests the course decks present in `data/materials`.
+- `seed_data.py` — ingests the course decks present in `data/materials` into
+  the first course.
 
 ## Setup
 
+Requires **Python 3.11+** and **LibreOffice** (for `.pptx` slide images).
+
+| | macOS | Ubuntu / WSL |
+|---|---|---|
+| LibreOffice | `brew install --cask libreoffice` | `sudo apt install libreoffice-impress` |
+| Python 3.11+ | `brew install python@3.12` | Ubuntu 22.04 ships 3.10: `uv python install 3.12` ([uv](https://docs.astral.sh/uv/)) |
+
+Plain PDFs need no LibreOffice. Check with `soffice --version`.
+
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
+python3 -m venv .venv                # or: uv venv --python 3.12 .venv
+.venv/bin/pip install -e ".[dev]"    # or: uv pip install --python .venv/bin/python -e ".[dev]"
 cp .env.example .env                 # put the class key in COURSE_API_KEY (never commit)
 .venv/bin/python probe_endpoints.py  # optional: confirm the services answer
 # put the course decks (.pptx) in data/materials/, then:
@@ -122,20 +152,26 @@ cp .env.example .env                 # put the class key in COURSE_API_KEY (neve
 .venv/bin/python -m course_assistant.ui.app   # -> http://127.0.0.1:7860
 ```
 
-Requires Python 3.11+ and **LibreOffice** for PPTX→PDF
-(`brew install --cask libreoffice`). Plain PDFs need neither.
 
 ## Running
 
-- **Documents** tab — add/remove files. Re-adding the same file is detected by
-  content hash and skipped; removing a file drops its chunks *and* slide
-  images, so later answers can't use it.
+- **Course** (top of the page) — pick the class to work on, or type a name
+  under **New course** and click **Create course**. Each course has its own
+  documents, answers and quiz topics; switching clears the previous answer
+  and quiz.
+- **Documents** tab — drop one or more files to add them (one status line per
+  file). Re-adding the same file is detected by content hash and skipped. To
+  remove, pick one or more under **Remove documents** and click **Remove
+  selected**: this drops their chunks, vectors, slide images and stored copy,
+  so later answers can't use them. No retraining is involved.
 - **Ask** tab — pick decks (or ask all), type a text or visual question (e.g.
   "what does the *Vibe Coding on Prod* meme mean?"), and **Ask**. The answer
   cites document + slide/page, lists source excerpts, and shows the relevant
   slide images. Unanswerable questions trigger a clear "not in the material"
-  reply.
-- **Quiz** tab — pick decks, a topic, and a count, then generate. Answer the
+  reply; partly answerable ones are answered for the covered part with a
+  "Partly outside the slides" notice saying what is missing.
+- **Quiz** tab — pick decks, then a **Topic** from the dropdown (the general
+  topics found in those decks) and a count, then generate. Answer the
   MCQs and **Grade** for score + explanations, or **Show answers**; the key
   stays hidden until then.
 - **Light / dark** — both render correctly (app follows your OS/browser color
@@ -235,6 +271,9 @@ protection. We would switch reranking off if latency became the binding constrai
 for example live use during class, or if the corpus stayed this small, since here
 it adds time without changing any answer.
 
+**Note.** These runs predate the `coverage` field added to the answer schema
+(2026-09-24); they have not been rerun since.
+
 **Limitations.** The evidence is thin: 14 questions, two runs and a single human
 grader, and the first 10 questions were easy enough that both arms hit the ceiling.
 That is why the hard set was added, and even there only one question clearly
@@ -261,8 +300,12 @@ add/dedupe/remove, the embedder-mismatch guard, citation verification (a
 fabricated quote or an out-of-range source is rejected), service clients against
 faked transports (images sent as `messages`, thinking disabled, failures raise
 instead of degrading), quiz generation/scoring/hidden key, and end-to-end UI
-handler flows. The end-to-end module skips when gradio is not installed, and
-deck-dependent tests skip when `data/materials` has no decks.
+handler flows. The end-to-end module skips when gradio is not installed,
+deck-dependent tests skip when `data/materials` has no decks, and tests that
+need slide images skip when LibreOffice (`soffice`) is not on the PATH. Also
+covered: multi-file add, multi-select remove (including the stale-selection
+crash), removal deleting stored files and images, the coverage flag, quiz
+topic extraction and caching, and course isolation.
 `smoke_full.py` ingests a real deck live and checks both collections hold 2048-d
 vectors that differ between slides.
 
@@ -276,7 +319,13 @@ vectors that differ between slides.
 - Excerpt verification proves a quote exists in the cited chunk, not that the
   quote supports the claim. That judgement is the human `sources_support` column.
 - The evaluation is small (14 questions, 2 runs); see the interpretation above.
-- No auth; one shared quiz state per server process. Course use only.
+- Quiz topics come from each page's first line. For decks that line is the
+  slide title and the topics are good; for PDFs whose pages do not start with
+  a heading (e.g. the Assignment 2 PDF) the topics are weaker.
+- Courses cannot be renamed or deleted from the app yet.
+- No auth; one shared course selection and quiz state per server process, so
+  two people using the same server switch course for each other. Course use
+  only.
 
 ## Files
 
@@ -290,9 +339,11 @@ src/course_assistant/
     parsing.py            uploads -> pages + rendered slide images (LibreOffice)
     chunking.py           recursive / fixed chunkers
     index.py              BM25 + Chroma text & visual indexes, RRF, rerank, dedupe/remove
-    assistant.py          retrieval -> evidence -> {answer, citations} + verification
+    assistant.py          retrieval -> evidence -> {answer, citations, coverage} + verification
     quiz.py               grounded MCQs, hidden key, scoring
-  ui/app.py               Gradio UI (Ask / Quiz / Documents)
+    topics.py             quiz topic categories per document (cached)
+    courses.py            course workspaces (courses.json)
+  ui/app.py               Gradio UI (course picker + Ask / Quiz / Documents)
   factory.py              composition root (no Gradio dep), testable
 tests/                    unit + e2e (offline)
 probe_endpoints.py        prints the live request/response contract of :9001-:9005
