@@ -13,6 +13,7 @@ thin and the pure logic stays unit-testable.
 """
 from __future__ import annotations
 
+import html
 from pathlib import Path
 
 import gradio as gr
@@ -91,6 +92,43 @@ def remove_handler(app: AppState, doc_names):
     messages = [app.catalog.remove_document(name)["message"] for name in doc_names]
     app.sync_topics()
     return ("  \n".join(messages), *refresh_docs(app, clear_picks=True))
+
+
+def hero_html(course_name: str) -> str:
+    return f"""
+        <div class="course-hero">
+          <h1>📚 {html.escape(course_name)} Course Assistant</h1>
+          <p>Answer questions and generate practice quizzes from your course
+          material, with the original slide or page shown as visual evidence.</p>
+        </div>"""
+
+
+def switch_course_handler(app: AppState, name: str):
+    """Open another course. Returns (course_dd, course_msg, hero, doc_table,
+    remove_dd, ask_docs, q_docs, q_topic); the caller also clears the quiz."""
+    if name and name != app.course_name:
+        try:
+            app.switch_course(name)
+        except Exception as e:  # noqa: BLE001 — shown in the UI, key redacted
+            return (gr.update(value=app.course_name),
+                    f"⚠️ Could not open '{name}': {redact(str(e))}",
+                    *[gr.update() for _ in range(6)])
+    n = len(app.doc_choices())
+    msg = (f"Opened **{app.course_name}** — {n} document{'s' * (n != 1)} loaded."
+           if n else f"Opened **{app.course_name}** — no documents yet; add "
+                     "some on the Documents tab.")
+    return (gr.update(choices=app.courses.names(), value=app.course_name), msg,
+            hero_html(app.course_name), *refresh_docs(app, clear_picks=True),
+            topic_dropdown_update(app, []))
+
+
+def create_course_handler(app: AppState, name: str):
+    """Create an empty course and open it; same outputs as switching."""
+    try:
+        name = app.create_course(name or "")
+    except ValueError as e:
+        return (gr.update(), f"⚠️ {e}", *[gr.update() for _ in range(6)])
+    return switch_course_handler(app, name)
 
 
 def list_docs_df(app: AppState) -> list:
@@ -184,14 +222,18 @@ def q_inputs():
 
 
 def build_ui(app: AppState) -> gr.Blocks:
-    with gr.Blocks(title="MBAX 6418 Course Assistant") as demo:
+    with gr.Blocks(title="Course Assistant") as demo:
         gr.HTML(BRAND_CSS)
-        gr.HTML("""
-        <div class="course-hero">
-          <h1>📚 MBAX 6418 Course Assistant</h1>
-          <p>Answer questions and generate practice quizzes from your course
-          slides, with the original slide shown as visual evidence.</p>
-        </div>""")
+        hero = gr.HTML(hero_html(app.course_name))
+        with gr.Row():
+            course_dd = gr.Dropdown(label="Course", choices=app.courses.names(),
+                                    value=app.course_name, scale=2,
+                                    info="Each course keeps its own documents, "
+                                         "index and quiz topics")
+            new_course = gr.Textbox(label="New course", placeholder="e.g. FIN 6100",
+                                    scale=2)
+            create_btn = gr.Button("Create course", scale=1)
+        course_msg = gr.Markdown("")
 
         # ---------------- ASK ----------------
         with gr.Tab("Ask"):
@@ -297,14 +339,35 @@ def build_ui(app: AppState) -> gr.Blocks:
             remove_msg = gr.Markdown("")
             refresh_btn = gr.Button("Refresh")
 
-            file_up.change(lambda f: add_file_handler(app, f, []),
+            # ingest on upload only, then empty the box: with file_count
+            # "multiple" the box accumulates files and each drop re-sends all
+            # of them, which after a course switch copied the previous
+            # course's files into the new course
+            file_up.upload(lambda f: (*add_file_handler(app, f, []), None),
                            inputs=file_up, outputs=[add_msg, doc_table, remove_dd,
-                                                    ask_docs, q_docs])
+                                                    ask_docs, q_docs, file_up])
             remove_btn.click(lambda d: remove_handler(app, d),
                              inputs=remove_dd,
                              outputs=[remove_msg, doc_table, remove_dd, ask_docs, q_docs])
             refresh_btn.click(lambda: refresh_docs(app),
                               inputs=[], outputs=[doc_table, remove_dd, ask_docs, q_docs])
+
+        # ---------------- COURSES ----------------
+        # switching course swaps every document list and clears the old
+        # course's answer and quiz, so nothing from one class shows in another
+        course_outputs = [course_dd, course_msg, hero, doc_table, remove_dd,
+                          ask_docs, q_docs, q_topic]
+        cleared = [ask_answer, ask_gallery, q_status, q_result, file_up, add_msg,
+                   remove_msg, *qrows]
+
+        def _cleared():
+            return ("", [], "", "", None, "", "",
+                    *[gr.update(visible=False, value=None) for _ in qrows])
+
+        course_dd.input(lambda n: (*switch_course_handler(app, n), *_cleared()),
+                        inputs=course_dd, outputs=course_outputs + cleared)
+        create_btn.click(lambda n: (*create_course_handler(app, n), *_cleared()),
+                         inputs=new_course, outputs=course_outputs + cleared)
     return demo
 
 

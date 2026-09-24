@@ -123,10 +123,10 @@ def excerpt_in_text(excerpt: str, text: str) -> bool:
     return bool(e) and e in _norm(text)
 
 
-def _assistant_system() -> str:
+def _assistant_system(course_name: str = "this course") -> str:
     return (
-        "You are a helpful course assistant for the MBAX 6418 course "
-        "(large language models for business). Answer the student's question "
+        f"You are a helpful course assistant for {course_name}. "
+        "Answer the student's question "
         "using ONLY the numbered course-material evidence and any slide images "
         "shown to you.\n"
         "Rules:\n"
@@ -157,10 +157,11 @@ def _assistant_system() -> str:
 
 class Assistant:
     def __init__(self, catalog: Catalog, chat: ChatProvider,
-                 settings: Settings):
+                 settings: Settings, course_name: str = "this course"):
         self.catalog = catalog
         self.chat = chat
         self.settings = settings
+        self.course_name = course_name
 
     def retrieve(self, query: str, doc_names: list[str] | None = None,
                  k: int = 5, include_visual: bool = True):
@@ -212,7 +213,7 @@ class Assistant:
                 "verbatim excerpts. Answer whatever part it covers; set "
                 "found=false only if it covers none of the question.")
         data = self.chat.complete_json(
-            _assistant_system(), prompt, ANSWER_SCHEMA,
+            _assistant_system(self.course_name), prompt, ANSWER_SCHEMA,
             images=used_images if include_images else None)
 
         answer_text = str(data.get("answer", "")).strip()
