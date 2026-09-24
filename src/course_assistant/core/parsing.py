@@ -171,7 +171,10 @@ def parse_file(src: Path, settings: Settings, warn_cb=None) -> ParsedDoc:
                 texts = pptx_text_fallback(src)
                 pages = [Page(page_num=i, text=t) for i, t in enumerate(texts, 1)]
                 if warn_cb:
-                    warn_cb("Slide images unavailable: LibreOffice not installed.")
+                    warn_cb("Text only: LibreOffice is not installed, so no slide "
+                            "images were made and visual questions will not work "
+                            "for this deck. Install LibreOffice, then remove and "
+                            "re-add it.")
             else:
                 pdf = pptx_to_pdf(src, include_base)
                 pages = pdf_pages(pdf, include_base)

@@ -40,33 +40,53 @@ BRAND_CSS = """
 """
 
 
-def refresh_docs(app: AppState):
+def refresh_docs(app: AppState, clear_picks: bool = False):
+    """Updates for (doc_table, remove_dd, ask_docs, q_docs).
+
+    The remove selection is always cleared, and the Ask/Quiz selections too
+    when documents went away (``clear_picks``): Gradio rejects the next event
+    if a component still holds a value that is no longer among its choices.
+    """
+    choices = app.doc_choices()
+    picks = {"value": []} if clear_picks else {}
     return (gr.update(value=list_docs_df(app)),
-            gr.update(choices=app.doc_choices()),
-            gr.update(choices=app.doc_choices()),
-            gr.update(choices=app.doc_choices()))
+            gr.update(choices=choices, value=[]),
+            gr.update(choices=choices, **picks),
+            gr.update(choices=choices, **picks))
 
 
-def add_file_handler(app: AppState, filepath: str, files: list):
-    if not filepath:
+def add_file_handler(app: AppState, filepaths, files: list):
+    """Ingest one or more uploaded files; one message line per file.
+
+    A failure on one file is reported and the rest are still added.
+    """
+    if isinstance(filepaths, (str, Path)):
+        filepaths = [filepaths]
+    filepaths = [f for f in (filepaths or []) if f]
+    if not filepaths:
         return "No file selected.", *[gr.update() for _ in range(4)]
-    # copy into the app's materials dir (source of truth for indexing)
-    src = Path(filepath)
-    dest = app.settings.materials_dir / src.name
-    try:
-        dest.write_bytes(src.read_bytes())
-        res = app.catalog.add_file(str(dest))
-    except Exception as e:  # surface failures (e.g. LibreOffice) in the UI
-        return (f"⚠️ Could not add '{src.name}': {redact(str(e))}",
-                *[gr.update() for _ in range(4)])
-    return (res["message"], *refresh_docs(app))
+    messages = []
+    for filepath in filepaths:
+        # copy into the app's materials dir (source of truth for indexing)
+        src = Path(filepath)
+        dest = app.settings.materials_dir / src.name
+        try:
+            dest.write_bytes(src.read_bytes())
+            messages.append(app.catalog.add_file(str(dest))["message"])
+        except Exception as e:  # surface failures (e.g. LibreOffice) in the UI
+            messages.append(f"⚠️ Could not add '{src.name}': {redact(str(e))}")
+    return ("  \n".join(messages), *refresh_docs(app))
 
 
-def remove_handler(app: AppState, doc_name: str):
-    if not doc_name:
-        return "Select a document to remove.", *[gr.update() for _ in range(4)]
-    res = app.catalog.remove_document(doc_name)
-    return (res["message"], *refresh_docs(app))
+def remove_handler(app: AppState, doc_names):
+    """Remove one or more documents and all their searchable content."""
+    if isinstance(doc_names, str):
+        doc_names = [doc_names]
+    doc_names = [d for d in (doc_names or []) if d]
+    if not doc_names:
+        return "Select at least one document to remove.", *[gr.update() for _ in range(4)]
+    messages = [app.catalog.remove_document(name)["message"] for name in doc_names]
+    return ("  \n".join(messages), *refresh_docs(app, clear_picks=True))
 
 
 def list_docs_df(app: AppState) -> list:
@@ -236,14 +256,16 @@ def build_ui(app: AppState) -> gr.Blocks:
 
         # ---------------- DOCUMENTS ----------------
         with gr.Tab("Documents"):
-            file_up = gr.File(label="Add course material (pdf, pptx, docx, txt, md)",
-                              type="filepath")
+            file_up = gr.File(label="Add course material (pdf, pptx, docx, txt, md) — "
+                                    "drop one or more files",
+                              type="filepath", file_count="multiple")
             add_msg = gr.Markdown("")
             doc_table = gr.Dataframe(
                 headers=["Document", "Text chunks", "Slides/pages"],
                 value=list_docs_df(app), interactive=False, wrap=True)
-            remove_dd = gr.Dropdown(choices=app.doc_choices(),
-                                    label="Remove a document")
+            remove_dd = gr.Dropdown(choices=app.doc_choices(), value=[],
+                                    multiselect=True, label="Remove documents",
+                                    info="Pick one or more, then click Remove")
             remove_btn = gr.Button("Remove selected", variant="stop")
             remove_msg = gr.Markdown("")
             refresh_btn = gr.Button("Refresh")

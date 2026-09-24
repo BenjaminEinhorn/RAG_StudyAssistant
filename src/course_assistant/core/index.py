@@ -12,6 +12,7 @@ the document's chunks AND images so later answers never rely on removed files.
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -151,7 +152,8 @@ class Catalog:
         if self.doc_exists(sha):
             return {"ok": True, "message": f"'{src.name}' was already loaded — skipped.", "duplicate": True}
 
-        parsed = parse_file(src, self.settings)
+        warnings: list[str] = []
+        parsed = parse_file(src, self.settings, warn_cb=warnings.append)
         chunks = chunk_document(parsed, self.settings, self.chunk_method)
         doc_id = parsed.sha256[:16]
 
@@ -184,12 +186,17 @@ class Catalog:
             n_images = len(imgs)
         self._save_registry()
         self._build_bm25()
-        return {"ok": True, "message": f"Added '{src.name}'", "doc_id": doc_id,
+        message = f"Added '{src.name}'"
+        if warnings:
+            message += " — ⚠️ " + " ".join(warnings)
+        return {"ok": True, "message": message, "doc_id": doc_id, "warnings": warnings,
                 "chunks": len(chunks), "slides": parsed.slide_count(),
                 "images": n_images}
 
     def remove_document(self, doc_name: str):
-        """Remove a document (by name) and ALL its indexed content/images."""
+        """Remove a document (by name) and ALL its indexed content, its
+        rendered slide images and the stored copy of the file, so re-seeding
+        from the materials folder cannot bring it back."""
         doc_ids = {c.doc_id for c in self._chunks.values() if c.doc_name == doc_name}
         if not doc_ids:
             return {"ok": False, "message": f"No document named '{doc_name}'."}
@@ -197,6 +204,9 @@ class Catalog:
             self._text_col.delete(where={"doc_id": did})
             self._visual_col.delete(where={"doc_id": did})
             self._chunks = {cid: c for cid, c in self._chunks.items() if c.doc_id != did}
+            # images live in images/<first 12 hex of the file hash>/ (parsing.py)
+            shutil.rmtree(self.settings.images_dir / did[:12], ignore_errors=True)
+        (self.settings.materials_dir / doc_name).unlink(missing_ok=True)
         self._save_registry()
         self._build_bm25()
         return {"ok": True, "message": f"Removed '{doc_name}' and its searchable content."}

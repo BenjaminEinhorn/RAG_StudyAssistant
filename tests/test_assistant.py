@@ -1,5 +1,5 @@
 """Unit tests for answer generation (structured answer/sources, missing-info)."""
-from conftest import REAL_DECK_W2, REAL_DECK_W5, needs_decks
+from conftest import needs_soffice, REAL_DECK_W2, REAL_DECK_W5, needs_decks
 from course_assistant.core.assistant import AnswerResult, Assistant
 
 
@@ -13,6 +13,7 @@ def test_answer_returns_structured_output(app_state, small_doc):
 
 
 @needs_decks
+@needs_soffice
 def test_answer_includes_image_when_available(app_state):
     r = app_state.catalog.add_file(str(REAL_DECK_W5))
     assert r["ok"] is True
@@ -109,3 +110,4 @@ def test_excerpt_matching_ignores_case_whitespace_and_quotes():
     assert excerpt_in_text('Vibe Coding on "Prod"', "Title: Vibe  Coding on “Prod”\n")
     assert not excerpt_in_text("", "anything")
     assert not excerpt_in_text("not there", "something else")
+

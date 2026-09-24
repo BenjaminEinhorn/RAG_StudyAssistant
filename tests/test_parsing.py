@@ -42,9 +42,7 @@ def test_sha256_is_content_hash(tmp_path):
     assert sha256_of(a) == sha256_of(a)
 
 
-def test_pptx_parses_with_slide_images(settings):
-    """Build a 2-slide pptx and verify LibreOffice conversion yields slide
-    images and per-slide text."""
+def _two_slide_deck(settings):
     from pptx import Presentation
     from pptx.util import Inches
 
@@ -58,8 +56,24 @@ def test_pptx_parses_with_slide_images(settings):
     pptx = settings.materials_dir / "deck.pptx"
     pptx.parent.mkdir(parents=True, exist_ok=True)
     prs.save(pptx)
+    return pptx
 
-    doc = parse_file(pptx, settings)
+
+def test_pptx_without_libreoffice_warns_text_only(settings, monkeypatch):
+    monkeypatch.setattr("course_assistant.core.parsing.find_soffice", lambda: None)
+    warnings = []
+    doc = parse_file(_two_slide_deck(settings), settings, warn_cb=warnings.append)
+    assert doc.slide_count() == 2
+    assert not any(p.image_path for p in doc.pages)
+    assert warnings and "LibreOffice is not installed" in warnings[0]
+
+
+@pytest.mark.skipif(__import__("shutil").which("soffice") is None,
+                    reason="LibreOffice (soffice) not installed")
+def test_pptx_parses_with_slide_images(settings):
+    """Build a 2-slide pptx and verify LibreOffice conversion yields slide
+    images and per-slide text."""
+    doc = parse_file(_two_slide_deck(settings), settings)
     assert doc.slide_count() == 2
     assert all(p.image_path for p in doc.pages), "every slide should render an image"
     assert any("Vibe Coding" in p.text for p in doc.pages)
