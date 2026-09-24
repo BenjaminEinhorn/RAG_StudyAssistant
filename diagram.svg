@@ -79,7 +79,7 @@
   <text x="870" y="322" fill="#e6e6e6" font-size="12" font-weight="600">ANSWER GENERATION (vision LLM, remote)</text>
   <text x="870" y="342" fill="#9aa4b1" font-size="11">prompt = top evidence + source refs; slide images</text>
   <text x="870" y="360" fill="#9aa4b1" font-size="11">sent as vision input when relevant</text>
-  <text x="870" y="378" fill="#9aa4b1" font-size="11">→ JSON {coverage, beyond_slides, found, answer, citations} · verified in code</text>
+  <text x="870" y="378" fill="#9aa4b1" font-size="11">→ JSON {coverage, found, answer, citations, further_topics} · verified</text>
 
   <line x1="1056" y1="392" x2="1056" y2="412" stroke="#e0a24b" stroke-width="2" marker-end="url(#arr)"/>
 

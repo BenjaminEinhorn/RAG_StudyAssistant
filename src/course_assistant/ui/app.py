@@ -21,6 +21,7 @@ import gradio as gr
 from ..config.settings import Settings, redact
 from ..core.assistant import Assistant
 from ..core.index import Catalog
+from ..core.further import further_markdown, suggest_further_topics
 from ..core.quiz import Quiz, generate_quiz, score
 from ..factory import AppState
 
@@ -181,7 +182,8 @@ def ask_handler(app: AppState, question: str, doc_selection: list, ask_images: b
         for img in cited + result.used_images:
             if img not in [g for g, _ in gallery]:
                 gallery.append((img, _caption_of(result.evidence, img)))
-    return answer_md + src_md, gallery
+    further = further_markdown(result.further_topics)
+    return answer_md + src_md + ("\n\n" + further if further else ""), gallery
 
 
 def _caption_of(sources, img_path: str) -> str:
@@ -209,6 +211,17 @@ def quiz_feedback(quiz: Quiz, answers: dict[int, int], reveal_all: bool = False)
                      f"<span class=hint>Source: {r['source_doc']} — slide/page "
                      f"{r['source_page']} · “{(r['source_excerpt'] or '')[:200]}”</span>")
     return "\n\n".join(lines)
+
+
+def quiz_further_md(app: AppState, topic: str, doc_names: list[str] | None) -> str:
+    """"Explore further" block for a generated quiz. A failure here never
+    affects the quiz itself; it just leaves the block out with a note."""
+    try:
+        items = suggest_further_topics(app.assistant.chat, topic,
+                                       covered=app.topics.topics_for(doc_names))
+    except Exception as e:  # noqa: BLE001 — shown in the UI, key redacted
+        return f"<span class=hint>No further-learning suggestions: {redact(str(e))}</span>"
+    return further_markdown(items)
 
 
 def topic_dropdown_update(app: AppState, doc_names: list[str] | None,
@@ -277,7 +290,7 @@ def build_ui(app: AppState) -> gr.Blocks:
 
             def gen(app, topic, num, docs):
                 if not topic:
-                    return ("Add course material first, then pick a topic.", "",
+                    return ("Add course material first, then pick a topic.", "", "",
                             *[gr.update() for _ in range(MAX_QUESTIONS)])
                 try:
                     quiz = generate_quiz(app.catalog, app.assistant.chat,
@@ -285,7 +298,7 @@ def build_ui(app: AppState) -> gr.Blocks:
                                          num_questions=int(num))
                     app.quiz = quiz
                 except Exception as e:  # surface clear, non-crashing error
-                    return (f"⚠️ Could not generate quiz: {redact(str(e))}", "",
+                    return (f"⚠️ Could not generate quiz: {redact(str(e))}", "", "",
                             *[gr.update() for _ in range(MAX_QUESTIONS)])
                 updates = []
                 for i, q in enumerate(quiz.questions):
@@ -296,7 +309,8 @@ def build_ui(app: AppState) -> gr.Blocks:
                 for _ in range(len(quiz.questions), MAX_QUESTIONS):
                     updates.append(gr.update(visible=False, value=None))
                 return (f"✅ Generated {quiz.total()} questions — answer below, "
-                        "then **Grade** (or **Show answers**).", "", *updates)
+                        "then **Grade** (or **Show answers**).", "",
+                        quiz_further_md(app, topic, docs or None), *updates)
 
             def grade(app, *radio_answers):
                 if app.quiz is None:
@@ -313,9 +327,10 @@ def build_ui(app: AppState) -> gr.Blocks:
                 return quiz_feedback(app.quiz, {}, reveal_all=True)
 
             q_result = gr.Markdown("")
+            q_further = gr.Markdown("")
             q_gen.click(lambda t, n, d: gen(app, t, n, d),
                         inputs=[q_topic, q_num, q_docs],
-                        outputs=[q_status, q_result, *qrows])
+                        outputs=[q_status, q_result, q_further, *qrows])
             # topics follow the selected decks, and pick up newly added ones
             q_docs.change(lambda d, t: topic_dropdown_update(app, d, t),
                           inputs=[q_docs, q_topic], outputs=q_topic)
@@ -363,11 +378,11 @@ def build_ui(app: AppState) -> gr.Blocks:
         # course's answer and quiz, so nothing from one class shows in another
         course_outputs = [course_dd, course_msg, hero, doc_list, remove_btn,
                           ask_docs, q_docs, q_topic]
-        cleared = [ask_answer, ask_gallery, q_status, q_result, file_up, add_msg,
-                   remove_msg, *qrows]
+        cleared = [ask_answer, ask_gallery, q_status, q_result, q_further, file_up,
+                   add_msg, remove_msg, *qrows]
 
         def _cleared():
-            return ("", [], "", "", None, "", "",
+            return ("", [], "", "", "", None, "", "",
                     *[gr.update(visible=False, value=None) for _ in qrows])
 
         course_dd.input(lambda n: (*switch_course_handler(app, n), *_cleared()),

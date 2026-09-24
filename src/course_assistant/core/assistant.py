@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 
 from ..config.settings import Settings
 from ..services.chat import ChatProvider
+from .further import (FURTHER_INSTRUCTION, FURTHER_ITEMS_SCHEMA, RELATED_INSTRUCTION,
+                      clean_further)
 from .index import Catalog
 
 _NO_EVIDENCE = "<<no-evidence>>"
@@ -41,7 +43,9 @@ ANSWER_SCHEMA = {
     "additionalProperties": False,
     # coverage is decided first (JSON is generated in property order), so a
     # partly covered question is answered for its covered part, not refused
-    "required": ["coverage", "beyond_slides", "found", "answer", "citations"],
+    # the further-learning fields come last: written after the grounded answer
+    "required": ["coverage", "beyond_slides", "found", "answer", "citations",
+                 "question_is_about_course", "further_topics"],
     "properties": {
         "coverage": {"type": "string", "enum": list(COVERAGE)},
         "beyond_slides": {"type": "string"},
@@ -59,6 +63,8 @@ ANSWER_SCHEMA = {
                 },
             },
         },
+        "question_is_about_course": {"type": "boolean"},
+        "further_topics": FURTHER_ITEMS_SCHEMA,
     },
 }
 
@@ -100,6 +106,7 @@ class AnswerResult:
     citations: list[Citation] = field(default_factory=list)  # as the model cited
     coverage: str = "full"        # how much of the question the slides cover
     beyond_slides: str = ""       # what a full answer needs from outside them
+    further_topics: list[dict] = field(default_factory=list)  # general knowledge
 
     @property
     def outside_slides(self) -> bool:
@@ -151,6 +158,8 @@ def _assistant_system(course_name: str = "this course") -> str:
         "it at all. For 'partial' or 'none', set beyond_slides to one sentence "
         "naming what the slides do not cover; otherwise leave it empty. Never "
         "fill the gap with outside knowledge in the answer.\n"
+        "6. " + RELATED_INSTRUCTION + "\n"
+        "7. " + FURTHER_INSTRUCTION + "\n"
         "Answer in plain, concise prose.\n"
     )
 
@@ -259,4 +268,7 @@ class Assistant:
             citations=citations,
             coverage=coverage,
             beyond_slides=beyond if coverage != "full" else "",
+            # suggestions only for questions about the course subject
+            further_topics=(clean_further(data.get("further_topics"))
+                            if data.get("question_is_about_course", True) else []),
         )

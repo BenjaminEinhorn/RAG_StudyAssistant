@@ -71,7 +71,15 @@ whether the slides answer the whole question; for `partial` the model answers
 only the covered part and `beyond_slides` names what a full answer would need
 from outside the slides, shown as a notice under the answer. `coverage` comes
 first in the schema because the JSON is generated in order: with `found` first,
-the model refused mixed questions outright. Every citation is then checked in code: the cited number must be an
+the model refused mixed questions outright. Last come `question_is_about_course`
+and `further_topics`: 3–5 related subjects to study beyond the material, the
+one place where the model's general knowledge is used on purpose. They are
+never mixed into the answer or cited, the UI labels them as not from your
+documents, and the code drops them when the question is not about the course
+(asked to hold back while listing, the model invented links, e.g. "Sports Data
+Analytics" for a Super Bowl question). The Quiz tab gets the same kind of list
+from one extra call after a quiz is generated, told which topics the material
+already covers. Every citation is then checked in code: the cited number must be an
 item retrieval actually returned, and the quoted excerpt must occur in that
 chunk's text (or, with no quote, the model must have been shown that slide's
 image). Only verified citations are listed as `sources`; anything else is
@@ -172,9 +180,13 @@ cp .env.example .env                 # put the class key in COURSE_API_KEY (neve
   cites document + slide/page, lists source excerpts, and shows the relevant
   slide images. Unanswerable questions trigger a clear "not in the material"
   reply; partly answerable ones are answered for the covered part with a
-  "Partly outside the slides" notice saying what is missing.
+  "Partly outside the slides" notice saying what is missing. Below the
+  sources, **Explore further** lists related subjects beyond the course
+  material (general knowledge, labelled as such; none for off-topic
+  questions).
 - **Quiz** tab — pick decks, then a **Topic** from the dropdown (the general
-  topics found in those decks) and a count, then generate. Answer the
+  topics found in those decks) and a count, then generate. **Explore further**
+  under the quiz suggests subjects beyond the chosen topic. Answer the
   MCQs and **Grade** for score + explanations, or **Show answers**; the key
   stays hidden until then.
 - **Light / dark** — both render correctly (app follows your OS/browser color
@@ -326,6 +338,12 @@ vectors that differ between slides.
   slide title and the topics are good; for PDFs whose pages do not start with
   a heading (e.g. the Assignment 2 PDF) the topics are weaker.
 - Courses cannot be renamed or deleted from the app yet.
+- "Explore further" suggestions come from the model's general knowledge and
+  are not checked. They add about 0.5 s per answer (median 6.0 s vs 5.5 s over
+  3 questions) and one call (~1.3 s) per quiz. Coverage judgement is not
+  perfectly stable: "What's the weather in Denver tomorrow?" was refused
+  correctly in 6 of 7 runs, but once came back as `coverage=full` with
+  suggestions; that run could not be reproduced.
 - No auth; one shared course selection and quiz state per server process, so
   two people using the same server switch course for each other. Course use
   only.
@@ -345,6 +363,7 @@ src/course_assistant/
     assistant.py          retrieval -> evidence -> {answer, citations, coverage} + verification
     quiz.py               grounded MCQs, hidden key, scoring
     topics.py             quiz topic categories per document (cached)
+    further.py            "Explore further" suggestions beyond the material
     courses.py            course workspaces (courses.json)
   ui/app.py               Gradio UI (course picker + Ask / Quiz / Documents)
   factory.py              composition root (no Gradio dep), testable
